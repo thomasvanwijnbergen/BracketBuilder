@@ -28,7 +28,7 @@
 
 ## About The Project
 
-![Screen Shot](Images/BracketBuilderTournament.png)
+![Screen Shot](Images/BracketBuilderTournamentEndFase.png)
 
 For my internship i was tasked to create a tool which could generate brackets (brackets for Mario Kart specifically)
 
