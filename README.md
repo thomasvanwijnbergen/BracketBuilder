@@ -78,6 +78,10 @@ Visual studio
 
 3. Run the project
 
+4. Change the Salt in AppSettings.json
+
+5. Change the password of the admin
+
 ## Usage
 
 Login into admin and create a tournament use the /help page for any other info or help needed
