@@ -1,0 +1,211 @@
+﻿@page "/profile"
+@page "/profile/{id}"
+
+@inject NavigationManager navManager;
+@inject IDatabaseService databaseService;
+@inject IDialogService dialogService;
+
+@if (loaded && Profile != null)
+{
+    <MudCard Elevation="3">
+        <MudCardHeader Class="d-flex flex-row gap-10">
+            <div class="gap-10">
+                <Avatar Clickable="false" showName="false" Account="Profile" />
+                <div class="d-flex flex-column cursor-pointer" @onclick=@(() => navManager.NavigateTo($"/profile/{Profile.Id}"))>
+                    <div class="d-flex flex-row align-center gap-2">
+                        <MudText Typo="Typo.h5"><b>@Profile.DisplayName</b></MudText>
+                        @if (Profile.Verified)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" Size="Size.Small" Color="Color.Primary" />
+                        }
+                    </div>
+                    <MudText Typo="Typo.caption">@@@Profile.Username</MudText>
+                </div>
+            </div>
+            <div>
+                <AuthorizeView Roles="@UserAccount.Admin">
+                    <Authorized>
+                        <MudTooltip Text="Edit profile settings">
+                            <MudIconButton Size="Size.Medium" Icon="@Icons.Material.Filled.Edit" OnClick="@(() => navManager.NavigateTo($"/settings/{Profile.Id}"))" />
+                        </MudTooltip>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+        </MudCardHeader>
+        <MudCardContent >
+            @foreach (var line in Profile.Bio.Split('\n'))
+            {
+                <MudText Typo="Typo.subtitle2">@line</MudText>
+            }
+            <br />
+            <div class="d-flex flex-row gap-2">
+                @{
+                    var createdText = $"Created at: {Profile.CreatedAt:dd-MM-yyyy HH:mm}";
+                }
+                <MudTooltip Delay="500" Text="@createdText">
+                    <MudIcon Icon="@Icons.Material.Filled.Cake" />
+                </MudTooltip>
+                <MudTooltip Delay="500" Text="@createdText">
+                    <MudText>
+                        @{
+                            var timeDifference = DateTime.Now - Profile.CreatedAt;
+                            var days = timeDifference.Days;
+                            var hours = timeDifference.Hours;
+                        }
+                        Member for @days days, @hours hours
+                    </MudText>
+                </MudTooltip>
+            </div>
+            <div class="d-flex flex-row gap-2">
+                <div class="d-flex flex-column gap-1">
+                    <MudText>Tournaments played: @Profile.AmountOfCompetedTournaments</MudText>
+                    <MudText>Tournaments won: @Profile.AmountOfWonTournaments</MudText>
+                    <MudText>Finals reached: @Profile.AmoutOfTimesInFinal</MudText>
+                    <MudText>Matches won: @Profile.AmoutOfWonMatches</MudText>
+                    @if (User != null && User.HasAccess)
+                    {
+                        <MudText Color="Color.Tertiary">Base seeding score: @Profile.BaseSeedingScore</MudText>
+                    }
+                </div>
+                <AuthorizeView Roles="@UserAccount.Admin">
+                    <Authorized>
+                        <div class="d-flex flex-column gap-1">
+                            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Edit" OnClick="EditProfileTournamentsPlayed" />
+                            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Edit" OnClick="EditProfileTournamentsWon" />
+                            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Edit" OnClick="EditProfileFinalsReached" />
+                            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Edit" OnClick="EditProfileMatchesWon" />
+                            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Edit" OnClick="EditProfileBaseSeedingScore" />
+                        </div>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+            <MudText Color="Color.Secondary" Typo="Typo.subtitle2"><b>Total Seeding score: @Tournament.CalculateSeedingScore(Profile)</b></MudText>
+
+        </MudCardContent>
+        <MudCardActions>
+            <MudPaper Elevation="5" Class="w100 object-fill grap-3">
+
+            </MudPaper>
+        </MudCardActions>
+    </MudCard>
+}
+else if (loaded && Profile == null) //it has loaded but hasnt gotten a profile
+{
+    <h3>Profile not found!</h3>
+}
+else
+{
+    <h3>Profile is loading...</h3>
+}
+
+@code {
+    [Parameter]
+    public string? ID { get; set; }
+
+    public int id
+    {
+        get
+        {
+            if (int.TryParse(ID, out int i))
+                return i;
+            else
+                return -1;
+        }
+    }
+
+    [CascadingParameter(Name = "AuthSession")]
+    public bool loggedIn { get; set; } = false;
+
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount User { get; set; } = null;
+
+
+    public UserAccount Profile { get; set; } = null;
+    private bool loaded;
+
+
+
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await Task.Delay(100);
+        if (loggedIn && User != null && !loaded)
+        {
+            Profile = (await databaseService.GetUsersByFilter(id: User.Id)).FirstOrDefault();
+            loaded = true;
+            StateHasChanged();
+        }
+        else if (!loaded)
+        {
+            navManager.NavigateTo("/login", true);
+            return;
+        }
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (id != -1)
+        {
+            Profile = (await databaseService.GetUsersByFilter(id:id)).FirstOrDefault();
+            loaded = true;
+        }
+
+    }
+
+    public async void EditProfileTournamentsPlayed()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Score", Profile.AmountOfCompetedTournaments);
+        parameters.Add("Type", nameof(Models.UserAccount.AmountOfCompetedTournaments));
+        await RewardPoints(parameters, "played Tournaments");
+    }
+    public async void EditProfileTournamentsWon()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Score", Profile.AmountOfWonTournaments);
+        parameters.Add("Type", nameof(Models.UserAccount.AmountOfWonTournaments));
+        await RewardPoints(parameters, "won Tournaments");
+    }
+    public async void EditProfileFinalsReached()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Score", Profile.AmoutOfTimesInFinal);
+        parameters.Add("Type", nameof(Models.UserAccount.AmoutOfTimesInFinal));
+        await RewardPoints(parameters, "finals reached");
+    }
+    public async void EditProfileMatchesWon()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Score", Profile.AmoutOfWonMatches);
+        parameters.Add("Type", nameof(Models.UserAccount.AmoutOfWonMatches));
+        await RewardPoints(parameters, "won Matches");
+    }
+    public async void EditProfileBaseSeedingScore()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Score", Profile.BaseSeedingScore);
+        parameters.Add("Type", nameof(Models.UserAccount.BaseSeedingScore));
+        await RewardPoints(parameters, "Base seeding score");
+    }
+
+    private async Task RewardPoints(DialogParameters parameters, string Context)
+    {
+        parameters.Add("Player", null);
+        parameters.Add("Account", Profile);
+        parameters.Add("Context", Context);
+        DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = true };
+        var dialog = await dialogService.ShowAsync<PointsDialog>($"Update amount of {Context}", parameters, closeOnEscapeKey);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            if (id == -1)
+                navManager.NavigateTo("/profile");
+            else
+                navManager.NavigateTo($"/profile/{id}");
+        }
+    }
+
+}

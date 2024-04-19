@@ -1,0 +1,249 @@
+﻿@page "/import";
+@inject IWebHostEnvironment WebHostEnvironment;
+@inject IDatabaseService databaseService;
+@inject ISnackbar snackBar;
+@inject IDialogService dialogService;
+@inject NavigationManager navManager;
+@using System.Text;
+
+<PageTitle>Import</PageTitle>
+
+<AuthorizeView Roles="@UserAccount.Access">
+    <Authorized>
+        <div Class="gap-4 d-flex flex-wrap">
+            <MudText Class="w100">Import</MudText>
+            <MudButton Color="Color.Tertiary" Variant="Variant.Filled" OnClick="ShowUsers">Users overview</MudButton>
+        
+            <MudButton HtmlTag="label"
+                        Variant="Variant.Filled"
+                        Color="Color.Primary"
+                        StartIcon="@Icons.Material.Filled.CloudUpload"
+                        >
+                        Upload CSV
+                <MudFileUpload T="IBrowserFile" FilesChanged="LoadFilesNew"></MudFileUpload>
+            </MudButton>
+            <MudExpansionPanel Text="Edit:">
+                <MudTextField @bind-Value="Text" T="string" Lines="8" />
+                <MudButton OnClick="() => StateHasChanged()">Refresh</MudButton>
+            </MudExpansionPanel>
+            @if (errors.Count > 0)
+            {
+                <h2>Errors</h2>
+                <ul class="text-danger">
+                    @foreach (var error in errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            }
+            @if (!string.IsNullOrEmpty(Text))
+            {
+                <MudSelect T="char" Label="Split by:" @bind-Value="splitChar">
+                    <MudSelectItem Value="@(',')">Comma (,)</MudSelectItem>
+                    <MudSelectItem Value="@(';')">Semicolon (;)</MudSelectItem>
+                    <MudSelectItem Value="@('\n')">Enter (\n)</MudSelectItem>
+                </MudSelect>
+                <MudText Class="w100">The result is:</MudText>
+
+                <MudExpansionPanel Text="Preview">
+                    <p>Going to be added</p>
+                    <MudPaper>
+                        @{
+                            used = new List<string>();
+                        }
+                        @foreach (string value in Text.Split(splitChar))
+                        {
+                            var item = value.Trim();
+                            if (string.IsNullOrEmpty(item) || item.Contains("\0"))
+                                continue;
+
+                            if (usernames != null && usernames.Contains(item.ToLower()))
+                                continue;
+
+                            if (used.Contains(item.ToLower()))
+                                continue;
+
+                            used.Add(item.ToLower());
+                            @item
+                            <br />
+                        }
+                    </MudPaper>
+                    <p>Failed to be added, because they already exist</p>
+                    <MudPaper>
+                        @{
+                            unused = Text.Split(splitChar).Select(s => s.Trim().ToLower()).ToList();
+
+                            foreach (var name in used) 
+                            {
+                                unused.Remove(name);
+                            }
+                        }
+                        @foreach (string value in unused)
+                        {
+                            var item = value.Trim();
+                            if (string.IsNullOrEmpty(item) || item.Contains("\0"))
+                                continue;
+
+                            snackBar.Add("Failed to some players because they already exist, check below to see who didnt make it", Severity.Warning);
+
+                            @item
+                            <br />
+                        }
+                    </MudPaper>
+                </MudExpansionPanel>
+                <MudButton Color="Color.Info" Variant="Variant.Filled" OnClick="AddUsers">Add Users</MudButton>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <Auth />
+    </NotAuthorized>
+</AuthorizeView>
+
+    
+
+@code {
+
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount? User { get; set; }
+
+    private long maxFileSize = 1024 * 1024 * 3; // represents 3MB
+    private int maxAllowedFiles = 3;
+    private List<string> errors = new();
+    private string Text = string.Empty;
+    private char splitChar = '\n';
+
+    private List<string> usernames;
+    private List<string> used = new List<string>();
+    private List<string> unused = new List<string>();
+
+    //protected override async Task OnInitializedAsync()
+    //{
+    //    if (User == null || User.Role != "Administrator")
+    //        navManager.NavigateTo("/", true);
+    //}
+    protected override async Task OnInitializedAsync()
+    {
+        usernames = (await databaseService.GetUsersByFilter()).Select(u => u.Username.ToLower()).ToList();
+    }
+
+    private async Task LoadFiles(InputFileChangeEventArgs e)
+    {
+        errors.Clear();
+
+        if (e.FileCount > maxAllowedFiles)
+        {
+            errors.Add($"Error: Attempting to upload {e.FileCount} files, but only {maxAllowedFiles} files are allowed");
+            return;
+        }
+
+        foreach (var file in e.GetMultipleFiles(maxAllowedFiles))
+        {
+            try
+            {
+                string newFileName = Path.ChangeExtension(
+                    Path.GetRandomFileName(),
+                    Path.GetExtension(file.Name));
+
+                string path = Path.Combine(
+                    WebHostEnvironment.WebRootPath,
+                    "documents",
+                    newFileName);
+
+                Directory.CreateDirectory(Path.Combine(
+                    WebHostEnvironment.WebRootPath,
+                    "documents"));
+
+                await using FileStream fs = new(path, FileMode.Create);
+                await file.OpenReadStream(maxFileSize).CopyToAsync(fs);
+
+                fs.Close();
+
+                Text += await File.ReadAllTextAsync(path);
+                File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"File: {file.Name} Error: {ex.Message}");
+            }
+        }
+
+    }
+
+    private async Task LoadFilesNew(IBrowserFile file)
+    {
+        errors.Clear();
+
+        try
+        {
+            string newFileName = Path.ChangeExtension(
+                Path.GetRandomFileName(),
+                Path.GetExtension(file.Name));
+
+            string path = Path.Combine(
+                WebHostEnvironment.WebRootPath,
+                "documents",
+                newFileName);
+
+            Directory.CreateDirectory(Path.Combine(
+                WebHostEnvironment.WebRootPath,
+                "documents"));
+
+            await using FileStream fs = new(path, FileMode.Create);
+            await file.OpenReadStream(maxFileSize).CopyToAsync(fs);
+
+            fs.Close();
+
+            Text += await File.ReadAllTextAsync(path);
+            File.Delete(path);
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"File: {file.Name} Error: {ex.Message}");
+        }
+
+    }
+    public async void ShowUsers()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Accounts", await databaseService.GetUsersByFilter(role:UserAccount.User, verified:false));
+        DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = true };
+
+        var dialog = dialogService.Show<UsersViewDialog>("View users", parameters, closeOnEscapeKey);
+
+        var result = await dialog.Result;
+        if (result != null && result.Data != null && (bool)result.Data == true)
+        {
+            //idk
+        }
+        //idk
+    }
+
+    public async void AddUsers()
+    {
+        int count = 0;
+        var list = Text.Split(splitChar);
+        foreach (var item in list)
+        {
+            var item2 = item.Trim();
+            if (string.IsNullOrEmpty(item2) || item2.Contains("\0"))
+                continue;
+            var result = await databaseService.Register(new UserAccount()
+                {
+                    Username = $"{item2}",
+                    Email = $"{item2}@example.com",
+                    Password = $"{Guid.NewGuid()}",
+                    DisplayName = $"{item2}",
+                    Role = "User"
+            });
+            if (result == "success")
+                count++;
+        }
+        if (count == 0)
+            snackBar.Add($"no users have been added");
+        else if (count == 1)
+            snackBar.Add($"1 user was added");
+        else
+            snackBar.Add($"{count} users have been added");
+    }
+}

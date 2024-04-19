@@ -1,0 +1,171 @@
+﻿@inject IDatabaseService databaseService;
+@inject ISnackbar snackBar;
+@inject IJSRuntime JSRuntime;
+@inject IDialogService dialogService;
+@inject RemoteService remoteService;
+@inject CommunicationService commService;
+@inject DatabaseDTOService dtoService;
+@using BlafettisLib;
+
+@{
+        int matchNumber = 0;
+}
+<CascadingValue Name="HasControl" Value="Control">
+    <div class="d-flex flex-row gap-2">
+        <Blafettis style="display:inline-block;height:0;width:0;margin-left: auto;margin-right: auto; z-index:60" angle="40" width="@width" height="@height" spread="@spread" stagger="@stagger" elementCount="@elementCount" duration="@duration" dragFriction="@dragFriction" startVelocity="@startVelocity" @ref="blafettis1" />
+        <div class="container w100">
+            <div class="tournament-bracket tournament-bracket--rounded">
+                @for (int i = 1; i <= Tournament.FinalMatch.Position; i++)
+                {
+                    <div class="tournament-bracket__round tournament-bracket__round--semifinals">
+                        @{
+                            var reverseIndex = Tournament.FinalMatch.Position - i;
+
+                            var text = reverseIndex switch
+                            {
+                                0 => "Finals",
+                                1 => "Semi Finals",
+                                2 => "Quarter Finals",
+                                //3 => "Mid",
+                                _ => "none"
+                            };
+
+                            if (text.StartsWith("none"))
+                            {
+                                text = i switch
+                                {
+                                    1 => "Start Rounds",
+                                    2 => "2d",
+                                    3 => "3rd",
+                                    _ => $"{i}th"
+                                };
+                            }
+                            if (i == 1) text = "Start Rounds";
+
+                        }
+                        <h3 class="tournament-bracket__round-title">@text</h3>
+                        <ul class="tournament-bracket__list">
+                            @foreach (Match match in TournamentMatches.Where(m => m.Position == i))
+                            {
+                                matchNumber++;
+                                int currentMatchNumber = matchNumber;
+                                string classStyle = (match.Position == 1) ? "tournament-bracket__firstitem" : "tournament-bracket__item";
+                                <li class="@(classStyle)">
+                                    <MudPaper Class="d-flex flex-row gap-2 justify-space-between tournament-bracket__match" Elevation="4">
+                                        <div class="d-flex flex-column gap-2">
+                                            @for (int i = 0; i < Tournament.AmountOfPlayerInMatch; i++)
+                                            {
+                                                if (match.Competitors.Count() > i)
+                                                {
+                                                    var player = match.Competitors[i];
+                                                    <Avatar Match="match" OnClick="Click" Player="player" Account="player.Account" />
+
+                                                }
+                                                else
+                                                {
+                                                    <Avatar Match="match" OnClick="Click" Account="null" />
+                                                }
+                                            }
+                                        </div>
+                                        <MudText Style="opacity: .5;" Typo="Typo.h5">@currentMatchNumber</MudText>
+                                    </MudPaper>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+        </div>
+        <Blafettis style="display:inline-block;height:0;width:0;margin-left: auto;margin-right: auto; z-index:60" angle="140" width="@width" height="@height" spread="@spread" stagger="@stagger" elementCount="@elementCount" duration="@duration" dragFriction="@dragFriction" startVelocity="@startVelocity" @ref="blafettis2" />
+    </div>
+</CascadingValue>
+
+@code {
+
+    [Parameter]
+    public Tournament Tournament { get; set; }
+
+    [Parameter]
+    public bool Control { get; set; }
+
+    [Parameter]
+    public List<Match> TournamentMatches { get; set; }
+
+    private string width = "15px";
+    private string height = "15px";
+    private int spread = 69;
+    private int stagger = 10;
+    private int elementCount = 200;
+    private int duration = 4000;
+    private double dragFriction = 0.15;
+    private int startVelocity = 70;
+
+
+    protected Blafettis blafettis1;  // get the reference
+    protected Blafettis blafettis2;  // get the reference
+
+    public void RaiseConfetti()
+    {
+        blafettis1.RaiseConfetti();
+        blafettis2.RaiseConfetti();
+    }
+    /// <summary>
+    /// To advance the player to the next required match, we'll need both the match designation and the account ID.
+    /// </summary>
+    /// <param name="e"></param>
+    /// <param name="match"></param>
+    /// <param name="id"></param>
+    private async void Click(MouseEventArgs e, Match match, int id)
+    {
+        // the player goes to the next match
+        var player = match.Competitors.FirstOrDefault(p => p.Account.Id == id);
+
+        if (player != null && match.Parent != null && match.isActive)
+        {
+            if (match.Parent.Competitors.Contains(player))
+            {
+                player.Position = match.Position;
+                player.Winner = false;
+                await dtoService.UpdateMatch(player.Id, match);
+                match.Parent.Competitors.Remove(player);
+            }
+            else
+            {
+                if (match.Parent.Competitors.Count < Tournament.AmountOfPlayerInMatch)
+                {
+                    player.Position = match.Parent.Position;
+                    await dtoService.UpdateMatch(player.Id, match);
+                    match.Parent.Competitors.Add(player);
+                }
+            }
+            if (Tournament.Guid != null)
+                commService.CallRequestRefresh((Guid)Tournament.Guid, false);
+
+            remoteService.CallRequestRefresh();
+        }
+        else if (player != null && match.Parent == null && match.isActive)
+        {
+            player.Winner = !player.Winner;
+            if (player.Winner)
+            {
+                foreach (var competitor in match.Competitors)
+                {
+                    competitor.Winner = false;
+                    if (competitor == player)
+                        competitor.Winner = true;
+
+                    await dtoService.UpdateMatchPlayercouple(competitor.Id, competitor);
+                }
+            }
+            else
+            {
+                await dtoService.UpdateMatchPlayercouple(player.Id, player);
+            }
+            if (Tournament.Guid != null)
+                commService.CallRequestRefresh((Guid)Tournament.Guid, false);
+
+            remoteService.CallRequestRefresh();
+        }
+
+    }
+}

@@ -1,0 +1,284 @@
+﻿@page "/login"
+@page "/login/admin"
+@page "/login/{base64}"
+@page "/login/admin/{base64}"
+
+@inject IDatabaseService userAccountService;
+@inject IJSRuntime js;
+@inject AuthenticationStateProvider authProvider;
+@inject NavigationManager navManager;
+@inject ISnackbar snackBar;
+
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject ProtectedSessionStorage protectedSessionStorage
+
+@if (LoginMode)
+{
+    <MudCard Style="max-width:25rem;">
+        <MudCardHeader><MudText Typo="Typo.h3">Login</MudText></MudCardHeader>
+        <MudCardContent>
+            <MudTextField @bind-Value="@Lmodel.Email" Label="Email" />
+            <MudExtensions.MudPasswordField @bind-Value="@Lmodel.Password" Label="Password" />
+            <MudLink Typo="Typo.caption" Style="opacity:.7;" OnClick="() => visible = true">Forgot password?</MudLink>
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton @onclick="Authenticate" Variant="Variant.Filled" Color="Color.Primary">Login</MudButton>
+            <MudSpacer />
+            <MudLink OnClick="() => LoginMode = !LoginMode">Register instead.</MudLink>
+        </MudCardActions>
+    </MudCard>
+}
+else
+{
+    <MudCard Style="max-width:25rem;">
+        <MudCardHeader><MudText Typo="Typo.h3">Register</MudText></MudCardHeader>
+        <MudCardContent>
+            <MudTextField @bind-Value="@Rmodel.Username" Label="Username" Counter="20" MaxLength="20" />
+            <MudTextField @bind-Value="@Rmodel.Email" Label="Email" />
+            <MudExtensions.MudPasswordField @bind-Value="@Rmodel.Password" Label="Password" />
+            <MudExtensions.MudPasswordField @bind-Value="@Rmodel.PasswordConfirm" Label="Confirm Password" />
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton @onclick="Register" Variant="Variant.Filled" Color="Color.Primary">Register</MudButton>
+            <MudSpacer />
+            <MudLink OnClick="() => LoginMode = !LoginMode">Login instead.</MudLink>
+        </MudCardActions>
+    </MudCard>
+}
+<MudDialog @bind-IsVisible="visible">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.QuestionMark" Class="mr-3" /> Password reset
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <p>Enter in the email of the account</p>
+        <MudTextField T="string" @bind-Value="forgotEmailAddress" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Tertiary" OnClick="async () => {await ForgotPassword();}" Class="px-10">Send email request</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => visible = false" Class="px-10">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+
+    [Parameter]
+    public string? base64 { get; set; }
+
+    private bool LoginMode = true;
+    private bool visible;
+    private string forgotEmailAddress;
+    private LoginModel Lmodel = new LoginModel();
+    private class LoginModel
+    {
+#if DEBUG
+    public string Email { get; set; } = "admin@example.com";
+    public string Password { get; set; } = "admin";
+#else
+        public string Email { get; set; }
+        public string Password { get; set; }
+#endif
+    }
+
+    private RegisterModel Rmodel = new RegisterModel();
+    private class RegisterModel
+    {
+        public string Username { get; set; }
+        public string Email { get; set; }
+        public string Password { get; set; }
+        public string PasswordConfirm { get; set; }
+    }
+
+    private async Task ForgotPassword()
+    {
+        var userAccount = (await userAccountService.GetUsersByFilter(Email: forgotEmailAddress)).FirstOrDefault();
+        if (userAccount != null && userAccount.Banned)
+        {
+            snackBar.Add($"Hello {userAccount.Username}, your account has been terminated!", Severity.Error);
+            return;
+        }
+        if (userAccount == null)
+        {
+            snackBar.Add($"An account with the email \"{forgotEmailAddress}\" Does not exist!", Severity.Warning);
+            return;
+        }
+        if (!string.IsNullOrEmpty(userAccount.Identificaton))
+        {
+            //an request has already been sent
+            snackBar.Add($"An request to change the password has already been sent", Severity.Warning);
+            return;
+        }
+
+        await SendPasswordResetRequest(userAccount);
+        snackBar.Add($"An email with instructions has been sent to \"{forgotEmailAddress}\"", Severity.Success);
+    }
+
+
+    private async Task SendPasswordResetRequest(UserAccount account)
+    {
+        string verifyRequest = Guid.NewGuid().ToString();
+        //set verify request to now
+        //update the guid to something random
+        await userAccountService.UpdateUser(account.Id, Identification: verifyRequest);
+
+        // Construct the URL for verification
+        string url = $"{navManager.BaseUri}forgot/{account.Id}/{verifyRequest}";
+
+        // Construct the email content with the username
+        string emailContent = $@"
+        <div style='font-family: Arial, sans-serif;'>
+            <h2>Password Reset Request for {account.DisplayName}</h2>
+            <p>Hi {account.DisplayName},</p>
+            <p>We've received a request to reset the password for your account.</p>
+            <p>If you didn't request this, please ignore this email. Your account is secure.</p>
+            <p>If it was you, then click the link below to reset your password:</p>
+            <p><strong>Reset Password:</strong> <a href='{url}' style='color: #007bff; text-decoration: none;'>Reset Password</a></p>
+            <p style='font-size: 0.8em;'>Note: This link will expire in 24 hours for security reasons.</p>
+            <p>If you encounter any issues or need further assistance, feel free to contact our support team.</p>
+            <p>Best Regards,<br/>The BracketBuilder Team</p>
+        </div>";
+
+        // Send the email with the constructed content
+        await account.SendMail("Password Reset Request", emailContent);
+    }
+
+    private async Task Register()
+    {
+        if (string.IsNullOrEmpty(Rmodel.Username) ||
+            string.IsNullOrEmpty(Rmodel.Email) ||
+            string.IsNullOrEmpty(Rmodel.Password) ||
+            string.IsNullOrEmpty(Rmodel.PasswordConfirm))
+        {
+            snackBar.Add("All fields must be filled in!", Severity.Error);
+            return;
+        }
+        if (Rmodel.Password != Rmodel.PasswordConfirm)
+        {
+            snackBar.Add("Passwords do not match!", Severity.Error);
+            return;
+        }
+        UserAccount userAccount = new UserAccount
+            {
+                Email = Rmodel.Email,
+                DisplayName = Rmodel.Username,
+                Username = Rmodel.Username,
+                Password = Rmodel.Password,
+                Verified = false,
+                Role = UserAccount.User,
+            };
+        var code = await userAccountService.Register(userAccount);
+        if (code == "success")
+        {
+            //snackBar.Add("Account created, try to login in order to verify your email.", Severity.Success);
+            snackBar.Add($"You're not verified, an email with a link has been sent to you, check your inbox. ({userAccount.Email})", Severity.Warning);
+            await SendVerifyRequest(userAccount);
+            LoginMode = !LoginMode;
+            Lmodel = new LoginModel() { Email = Rmodel.Email, Password = Rmodel.Password };
+            Rmodel = new RegisterModel();
+            StateHasChanged();
+            return;
+        }
+        else
+        {
+            snackBar.Add(code, Severity.Error);
+            return;
+        }
+    }
+    public string Base64Decode(string base64EncodedData) => NavigationMenu.Base64Decode(base64EncodedData);
+
+    private async Task SendVerifyRequest(UserAccount account)
+    {
+        Guid verifyRequest = Guid.NewGuid();
+        //set verify request to now
+        //update the guid to something random
+        await userAccountService.UpdateUser(account.Id, VerifyRequest: DateTime.Now, VerifiedGuid: verifyRequest);
+
+        string url = $"{navManager.BaseUri}verify/{account.Id}/{verifyRequest}";
+
+        string emailContent = $@"
+        <div style='font-family: Arial, sans-serif;'>
+            <h2>Welcome to BracketBuilder, {account.DisplayName}!</h2>
+            <p>We've received a request to create a BracketBuilder account using this email address. If you didn't request this, no worries. Simply ignore this email, and your account will remain inactive.</p>
+            <p>If it was you, then you're just a click away from activating your account and exploring BracketBuilder's features!</p>
+            <p><strong>Activate Your Account:</strong> <a href='{url}' style='color: #007bff; text-decoration: none;'>Activate Your Account</a></p>
+            <p style='font-size: 0.8em;'>Note: This activation link will expire in 24 hours.</p>
+            <p style='font-size: 0.8em;'>Failing to activate your account within the 24 hour timespan, Will make the username availible again for signup, To extend this period you can login and a new verification request will be sent to you or will be extended.</p>
+            <p>The BracketBuilder Team</p>
+        </div>";
+
+
+        // Send the email with the constructed content
+        await account.SendMail("Activate BracketBuilder Account", emailContent);
+    }
+
+    private async Task Authenticate()
+    {
+        var userAccount = (await userAccountService.GetUsersByFilter(Email: Lmodel.Email)).FirstOrDefault();
+        if (userAccount != null && userAccount.Banned) {
+            snackBar.Add($"Hello {userAccount.Username}, your account has been terminated!",Severity.Error);
+            return; 
+        }
+        if (userAccount != null && !userAccount.Verified )
+        {
+            //no request has been send, send one now
+            if (userAccount.VerifyRequest == DateTime.MinValue)
+            {
+                snackBar.Add($"You're not verified, an email with a link has been sent to you, check your inbox. ({userAccount.Email})", Severity.Warning);
+                await SendVerifyRequest(userAccount);
+            }
+            else
+            {
+                // Check if the current time is after the expiration time of the verification link
+                if (DateTime.Now > userAccount.VerifyRequest.AddHours(24))
+                {
+                    // The verification link has expired
+                    snackBar.Add($"The old verification email has expired, a new one will be send to you, whenever an request has expired the account can be claimed. ({userAccount.Email})", Severity.Error);
+                    await SendVerifyRequest(userAccount);
+                }
+                else // still time left to verify
+                {
+                    snackBar.Add($"An request has already been sent to you!, an email with a link has been sent to you, check your inbox or your spam. Or try reloading the page. ({userAccount.Email})", Severity.Success);
+                    await userAccountService.UpdateUser(userAccount.Id, VerifyRequest: DateTime.Now); //extend the request
+                }
+            }
+            return;
+        }
+        var hash = UserAccount.Hash(Lmodel.Password, UserAccount.Salt);
+        if (userAccount is null || userAccount.Password != hash)
+        {
+            snackBar.Add("Invalid email or password, try again", Severity.Error);
+            return;
+        }
+
+        //reset the identification to invalidate it after logging in
+        await userAccountService.UpdateUser(userAccount.Id, Identification: string.Empty);
+        userAccount.Identificaton = string.Empty;
+
+        //log in the user
+        var authStateProvider = (AuthStateProvider)authProvider;
+        await authStateProvider.UpdateAuthenticationState(new UserSession
+            {
+                Username = userAccount.Username,
+                Role = userAccount.Role,
+            });
+        await protectedSessionStorage.SetAsync("user", (UserAccount)userAccount);
+
+        if (base64 != null)
+        {
+            var url = Base64Decode(base64);
+
+            if (url.StartsWith("http") && !url.ToLower().StartsWith(navManager.BaseUri.ToLower())) //we do not want to rediract to offsite urls
+            {
+                Console.WriteLine($"Offsite url detected: redirection to \"{url}\" was blocked.");
+                navManager.NavigateTo("/", true);
+                return;
+            }
+
+            navManager.NavigateTo(url, true);
+            return;
+        }
+
+        navManager.NavigateTo("/", true);
+    }
+}

@@ -1,0 +1,137 @@
+﻿@inject ISnackbar snackBar;
+@inject DatabaseDTOService dtoService;
+@inject IDatabaseService databaseService;
+@inject CommunicationService commService;
+
+
+<MudDialog style="max-width:1000px; width:100% !important;">
+    <DialogContent>
+        <div class="d-flex flex-row" style="width:900px;">
+            <div class="w-40">
+                <AccountTable @ref="AdminsTable" Accounts="exceptAdmins" Title="All Staff" />
+            </div>
+            <div class="middle">
+                <div class="d-flex flex-column gap-5" >
+                    <MudTooltip Delay="800" Text="Give selected Staffs access to the tournament">
+                        <MudIconButton Size="Size.Large" Icon="@Icons.Material.Filled.KeyboardDoubleArrowRight" OnClick="GiveAccessToTournament" />
+                    </MudTooltip>
+                    <MudTooltip Delay="800" Text="Remove selected Staffs access from the tournament">
+                        <MudIconButton Size="Size.Large" Icon="@Icons.Material.Filled.KeyboardDoubleArrowLeft" OnClick="RemoveAccessFromTournament"/>
+                    </MudTooltip>
+                </div>
+            </div>
+            <div class="w-40">
+                <AccountTable @ref="TournamentTable" Accounts="admins" Title="Staff for tournament" />
+            </div>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="Cancel">Cancel and Close</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="Save">Save Changes</MudButton>
+        <MudFocusTrap />
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance? MudDialog { get; set; }
+
+    [Parameter]
+    public Tournament? CurrentTournament { get; set; }
+
+    private AccountTable? AdminsTable { get; set; }
+    private AccountTable? TournamentTable { get; set; }
+
+    private List<UserAccount> AllAdmins = new List<UserAccount>();
+
+    private List<UserAccount> admins = new List<UserAccount>();
+    private List<UserAccount> exceptAdmins = new List<UserAccount>();
+
+    private void GiveAccessToTournament()
+    {
+        if (AdminsTable.selectedAccounts?.Count > 0)
+        {
+            foreach (var account in AdminsTable.selectedAccounts)
+            {
+                var acc = AllAdmins.FirstOrDefault(a => a.Id == account.Id);
+                if (acc != null)
+                {
+                    exceptAdmins.Remove(acc);
+                    admins.Add(acc);
+                }
+            }
+        }
+        else
+        {
+            snackBar.Add("No accounts selected",Severity.Warning);
+        }
+        clear();
+    }
+
+    private void RemoveAccessFromTournament()
+    {
+        if (TournamentTable.selectedAccounts?.Count > 0)
+        {
+            foreach (var account in TournamentTable.selectedAccounts)
+            {
+                var acc = AllAdmins.FirstOrDefault(a => a.Id == account.Id);
+                if (acc != null)
+                {
+                    admins.Remove(acc);
+                    exceptAdmins.Add(acc);
+                }
+            }
+        }
+        else
+        {
+            snackBar.Add("No accounts selected",Severity.Warning);
+        }
+        clear();
+    }
+
+    private void clear()
+    {
+        AdminsTable.selectedAccounts = new HashSet<UserAccount>();
+        TournamentTable.selectedAccounts = new HashSet<UserAccount>();
+
+        AdminsTable.searchString = string.Empty;
+        TournamentTable.searchString = string.Empty;
+
+
+        StateHasChanged();
+    }
+
+    private async Task Save()
+    {
+        var AlreadyJoined = (await dtoService.GetAdminsByTournamentId(CurrentTournament.Id)).ToList();
+        foreach (var leftOutUser in exceptAdmins)
+        {
+            await dtoService.DeleteTournamentAdminCouple(CurrentTournament,leftOutUser);
+        }
+        foreach (var joinedUser in admins)
+        {   
+            if (!AlreadyJoined.Contains(joinedUser))
+                await dtoService.CreateTournamentAdminCouple(CurrentTournament, joinedUser);
+        }
+
+        //update locally
+        CurrentTournament.Admins = admins;
+
+
+        //commService.CallRequestRefresh(CurrentTournament.Guid, false);
+        Cancel();
+    }
+
+    void Cancel() => MudDialog?.Cancel();
+
+    protected override async void OnInitialized()
+    {
+        admins = new List<UserAccount>(CurrentTournament.Admins);
+
+
+        AllAdmins = await databaseService.GetUsersByFilter(role: UserAccount.Admin);
+        AllAdmins.AddRange(await databaseService.GetUsersByFilter(role: UserAccount.Moderator));
+        exceptAdmins = AllAdmins.Except(admins).ToList();
+
+    }
+}

@@ -1,0 +1,21 @@
+﻿@page "/create";
+
+<AuthorizeView Roles="@UserAccount.Access">
+    <Authorized>
+        <h3>TournamentCreate</h3>
+        
+        <TournamentEditor CreateNew="true" User="User" />
+    </Authorized>
+    <NotAuthorized>
+        <Auth/>
+    </NotAuthorized>
+</AuthorizeView>
+
+
+
+@code {
+
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount? User { get; set; }
+
+}

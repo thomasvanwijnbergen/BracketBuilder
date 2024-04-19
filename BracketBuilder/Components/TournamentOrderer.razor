@@ -1,0 +1,81 @@
+﻿@inject IDatabaseService databaseService;
+@inject ISnackbar snackBar;
+@inject IJSRuntime JSRuntime;
+@inject IDialogService dialogService;
+@inject RemoteService remoteService;
+@inject CommunicationService commService;
+@inject DatabaseDTOService dtoService;
+@using BlafettisLib;
+
+@{
+        int matchNumber = 0;
+}
+<CascadingValue Name="HasControl" Value="false">
+    <MudDropContainer T="Player" Items="AllPlayers" ItemsSelector="@((item,dropzone) => item.Identifier == dropzone)" ItemDropped="ItemUpdated" Class="d-flex flex-wrap flex-grow-1">
+        <ChildContent>
+            <div class="d-flex flex-row gap-2">
+                <div class="container w100">
+                    <div class="tournament-bracket tournament-bracket--rounded">
+                        <div class="tournament-bracket__round tournament-bracket__round--semifinals">
+                            <h3 class="tournament-bracket__round-title">Start Rounds</h3>
+                            <ul class="tournament-bracket__list">
+                                @foreach (Match match in TournamentMatches.Where(m => m.Position == 1))
+                                {
+                                    matchNumber++;
+                                    int currentMatchNumber = matchNumber;
+                                    <li class="tournament-bracket__firstitem">
+                                        <MudPaper Class="d-flex flex-row gap-2 justify-space-between tournament-bracket__match" Elevation="4">
+                                            <MudDropZone T="Player" Identifier="@($"ID{currentMatchNumber}")" Class="d-flex flex-column gap-2">
+                                            </MudDropZone>
+                                            <MudText Style="opacity: .5;" Typo="Typo.h5">@currentMatchNumber</MudText>
+                                        </MudPaper>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </ChildContent>
+        <ItemRenderer>
+            <Avatar Player="@context" Account="@context.Account" />
+        </ItemRenderer>
+    </MudDropContainer>
+</CascadingValue>
+
+@code {
+
+    [Parameter]
+    public Tournament Tournament { get; set; }
+
+    [Parameter]
+    public bool Control { get; set; }
+
+    [Parameter]
+    public List<Match> TournamentMatches { get; set; }
+
+    List<Player> AllPlayers = new List<Player>();
+
+
+    private void ItemUpdated(MudItemDropInfo<Player> dropItem)
+    {
+        dropItem.Item.Identifier = dropItem.DropzoneIdentifier;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        AllPlayers.Clear();
+        int count = 0;
+        foreach (var match in TournamentMatches)
+        {
+            count++;
+            var list = match.Competitors.Except(AllPlayers);
+            foreach (var player in list)
+            {
+                player.Identifier = $"ID{count}";
+            }
+            AllPlayers.AddRange(list);
+        }
+    }
+
+}

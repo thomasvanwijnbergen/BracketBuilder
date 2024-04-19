@@ -1,0 +1,32 @@
+﻿@page "/tournament/{GuidStr}/reload";
+
+@inherits _LayoutTournamentUrl;
+@inject CommunicationService commService;
+
+
+<AuthorizeView>
+    <Authorized>
+        <PageTitle>
+            Tournament Reload
+        </PageTitle>
+        <MudButton Class="mb-2" Color="Color.Warning" Variant="Variant.Filled" OnClick="reload">Reload</MudButton>
+    </Authorized>
+    <NotAuthorized>
+        <Auth/>
+    </NotAuthorized>
+</AuthorizeView>
+
+
+@code {
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount? User { get; set; }
+
+    private void reload()
+    {
+        try
+        {
+            commService.CallRequestRefresh(CurrentTournament.Guid, true);
+        }
+        catch { }
+    }
+}

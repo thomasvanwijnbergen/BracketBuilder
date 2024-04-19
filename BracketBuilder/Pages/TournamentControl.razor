@@ -1,0 +1,111 @@
+﻿@page "/tournament/{GuidStr}/control";
+
+@inherits _LayoutUpdatableTournamentUrl;
+
+@inject NavigationManager navManager;
+@inject IDialogService dialogService;
+
+<PageTitle>
+    Tournament Control
+</PageTitle>
+
+<AuthorizeView Roles="@UserAccount.Access">
+    <Authorized>
+        @if (CurrentTournament != null)
+        {
+            if (CurrentTournament.HasAdmin(User))
+            {
+                <div class="mb-2 d-flex flex-row gap-2">
+                    @if (Guid != System.Guid.Empty && !IsMobile)
+                    {
+                        <MudButton Class="mb-2" Color="Color.Info" Href="@($"/tournament/{Guid}/detail")">Go back</MudButton>
+                    }
+                    <MudButton Class="mb-2" Color="Color.Warning" Variant="Variant.Filled" Disabled="CurrentTournament.Finished" OnClick="StartTournament">Configure</MudButton>
+                    @if (!IsMobile)
+                    {
+                        <MudButton Class="mb-2" Color="Color.Tertiary" Variant="Variant.Filled" OnClick="ViewTournament">View</MudButton>
+                    }
+                    <MudButton Class="mb-2" Color="Color.Success" Variant="@(CurrentTournament.Finished ? Variant.Outlined : Variant.Filled)" Disabled="CurrentTournament.Creator.Id != User.Id || CurrentTournament?.FinalMatch == null || CurrentTournament!.FinalMatch!.Competitors.Count(c => c.Winner) < 1" OnClick="ConfirmFinishTournament">@(CurrentTournament.Finished ? "View results" : "Finish tournament")</MudButton>
+                    <MudButton Class="mb-2" Color="Color.Error" Variant="Variant.Filled" OnClick="ConfirmClearScoresTournament">Clear Scores</MudButton>
+                    @if (!IsMobile)
+                    {
+                        <MudCheckBox @bind-Checked="OrderMode">Order mode</MudCheckBox>
+                    }
+                    </div>
+                <MudDivider />
+                <br />
+                <TourView2D @ref="Tour2dRef" Order="OrderMode" Tournament="CurrentTournament" Control="!CurrentTournament.Finished" />
+            }
+            else
+            {
+                <Auth />
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <Auth/>
+    </NotAuthorized>
+</AuthorizeView>
+
+
+@code {
+    private bool OrderMode = false;
+
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount? User { get; set; }
+
+    [CascadingParameter(Name = "IsMobile")]
+    public bool IsMobile { get; set; }
+
+    private TourView2D Tour2dRef { get; set; }
+
+    public async Task ViewTournament(MouseEventArgs e)
+    {
+        if (e.ShiftKey)
+            navManager.NavigateTo($"/tournament/{CurrentTournament.Guid}/fullscreen");
+        else
+            navManager.NavigateTo($"/tournament/{CurrentTournament.Guid}/view");
+    }
+
+    public async Task ConfirmFinishTournament(MouseEventArgs e)
+    {
+        //if its already finished, just show the results
+        if (CurrentTournament.Finished)
+        {
+            await Tour2dRef.FinishTournament();
+            return;
+        }
+
+        //ask to confirm to finish it
+        bool? result = await dialogService.ShowMessageBox(
+    "Finish tournament",
+    "Finishing and completing this tournament can NOT be undone!",
+    yesText: "Finish tournament!", cancelText: "Cancel");
+
+        if (result != null && result == true)
+        {
+            await Tour2dRef.FinishTournament();
+        }
+    }
+
+    public async Task ConfirmClearScoresTournament(MouseEventArgs e)
+    {
+        bool? result = await dialogService.ShowMessageBox(
+    "Clear ALL tournament asigned scores?",
+    "Do you want to clear the \"Score\" of every player for this tournament? this CANNOT be undone!",
+    yesText: "Clear scores", cancelText: "Cancel");
+
+        if (result != null && result == true)
+        {
+            await Tour2dRef.ClearScoreForAll();
+        }
+    }
+
+    public async void StartTournament()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Tournament", CurrentTournament);
+        DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = true };
+        var dialog = dialogService.Show<StartDialog>("Start tournament", parameters, closeOnEscapeKey);
+    }
+}

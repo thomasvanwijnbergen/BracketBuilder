@@ -1,0 +1,293 @@
+﻿@page "/settings"
+@page "/settings/{AccountIdStr}"
+
+@inject NavigationManager navManager
+@inject IDatabaseService databaseService
+
+<AuthorizeView Context="authContext">
+    <Authorized>
+        @if (isLoggedIn && Profile != null)
+        {
+            <MudCard>
+                <MudCardHeader>
+                    <MudText Typo="Typo.h6">
+                        Settings for 
+                        <MudTooltip Text="Go to profile">
+                            <MudLink Typo="Typo.h6" Href="@($"/profile/{Profile.Id}")">@Profile.DisplayName</MudLink>
+                        </MudTooltip>
+                    </MudText>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudTable Breakpoint="Breakpoint.None" Items="@Settings" Dense="true" CanCancelEdit="true" Filter="new Func<Setting,bool>(FilterFunc)"
+                    @bind-SelectedItem="selectedItem1" SortLabel="Sort By" CommitEditTooltip="Apply"
+                              RowEditPreview="BackupItem" RowEditCancel="ResetItemToOriginalValues"
+                              RowEditCommit="ItemHasBeenCommitted" EditTrigger="TableEditTrigger.EditButton">
+                        <ToolBarContent>
+                            <MudText Typo="Typo.h6">Account Settings</MudText>
+                            <MudSpacer />
+                            <MudTextField @bind-Value="searchString" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                        </ToolBarContent>
+                        <ColGroup>
+                            <col style="width:30%;" />
+                            <col style="width:60%;" />
+                            <col style="width:50px;" />
+                        </ColGroup>
+                        <HeaderContent>
+                            <MudTh><MudTableSortLabel SortBy="new Func<Setting, object>(x=>x.settingName)">Name</MudTableSortLabel></MudTh>
+                            <MudTh>Value</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="settingName">@context.settingName</MudTd>
+                            @if (context.settingName.ToLower() == "password")
+                            {
+                                <MudTd>*****</MudTd>
+                            }
+                            else
+                            {
+                                <MudTd>@context.settingValue</MudTd>
+                            }
+                        </RowTemplate>
+                        <RowEditingTemplate>
+                            <MudTd DataLabel="Sign">
+                                <MudText>@context.settingName</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Name">
+                                @if (context.settingName.ToLower() == "password")
+                                {
+                                    <MudExtensions.MudPasswordField @bind-Value="@context.settingValue" Required />
+                                }
+                                else if (context.settingName.ToLower() is "verified" or "banned")
+                                {
+                                    <MudSelect T="string" @bind-Value="@context.settingValue">
+                                        <MudSelectItem Value="@("True")">True</MudSelectItem>
+                                        <MudSelectItem Value="@("False")">False</MudSelectItem>
+                                    </MudSelect>
+                                }
+                                else if (context.settingName.ToLower() == "profilepicture")
+                                {
+                                    <MudTextField @bind-Value="@context.settingValue" />
+                                }
+                                else if (context.settingName.ToLower() == "username")
+                                {
+                                    <MudTextField @bind-Value="@context.settingValue" Counter="20"  MaxLength="20" /> 
+                                }
+                                else if (context.settingName.ToLower() == "displayname")
+                                {
+                                    <MudTextField @bind-Value="@context.settingValue" Counter="30" MaxLength="30" />
+                                }
+                                else if (context.settingName.ToLower() == "bio")
+                                {
+                                    <MudTextField Lines="3" @bind-Value="@context.settingValue" />
+                                }
+                                else if (context.settingName.ToLower() == "role")
+                                {
+                                    <MudSelect T="string" @bind-Value="@context.settingValue">
+                                        <MudSelectItem Value="@UserAccount.Admin">Admin</MudSelectItem>
+                                        <MudSelectItem Value="@UserAccount.Moderator">Mod</MudSelectItem>
+                                        <MudSelectItem Value="@("User")">User</MudSelectItem>
+                                    </MudSelect>
+                                }
+                                else
+                                {
+                                    <MudTextField @bind-Value="@context.settingValue" Required />
+                                }
+                            </MudTd>
+                        </RowEditingTemplate>
+                        <PagerContent>
+                            <MudTablePager />
+                        </PagerContent>
+                        <EditButtonContent Context="button">
+                            <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.Edit" Class="pa-0" OnClick="@button.ButtonAction" Disabled="@button.ButtonDisabled" />
+                        </EditButtonContent>
+                    </MudTable>
+                    <AuthorizeView Roles="@UserAccount.Admin">
+                        <Authorized>
+                            <MudButton Variant="Variant.Filled" OnClick="() => ResetPassword(Profile)" Color="Color.Tertiary">Reset their password</MudButton>
+                        </Authorized>
+                    </AuthorizeView>
+                </MudCardContent>
+            </MudCard>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <Auth />
+    </NotAuthorized>
+</AuthorizeView>
+
+
+@code {
+    public class Setting
+    {
+        public string settingName { get; set; }
+        public string settingValue { get; set; }
+
+        public Setting(string name, string value)
+        {
+            this.settingName = name;
+            this.settingValue = value;
+        }
+    }
+
+    public List<Setting> Settings = new List<Setting>();
+
+
+
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount User { get; set; } = null;
+
+    public UserAccount Profile { get; set; }
+
+    [CascadingParameter(Name = "AuthSession")]
+    public bool isLoggedIn { get; set; }
+
+    [Parameter]
+    public string? AccountIdStr { get; set; } = null;
+
+    public int? AccountId = null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Profile = User;
+        AccountId = ParsingExtention.IntTryParse(AccountIdStr);
+        if (User != null && AccountId != null && User.Role == UserAccount.Admin)
+        {
+            Profile = (await databaseService.GetUsersByFilter(id: (int)AccountId)).FirstOrDefault();
+        }
+        if (Profile == null) return;
+
+        Settings = new List<Setting>()
+        {
+            new("Username", Profile.Username),
+            new("DisplayName", Profile.DisplayName),
+            new("Password", string.Empty),
+            new("Bio", Profile.Bio),
+            new("ProfilePicture", Profile.ProfilePicture),
+            new("Email", Profile.Email),
+        };
+
+
+        if (User != null && AccountId != null && User.Role == UserAccount.Admin)
+        {
+            Settings.AddRange(new List<Setting>()
+            {
+                new("Role", Profile.Role),
+                new("Username", Profile.Username),
+                new("Verified", Profile.Verified.ToString()),
+                new("Banned", Profile.Banned.ToString()),
+                new("Identificaton", Profile.Identificaton),
+            });
+            Settings.Remove(new("Password", string.Empty));
+        }
+    }
+
+
+    private string searchString = "";
+    private Setting selectedItem1 = null;
+    private Setting settingBeforeEdit;
+    private HashSet<Setting> selectedItems1 = new HashSet<Setting>();
+    private TableEditTrigger editTrigger = TableEditTrigger.RowClick;
+
+
+    private void BackupItem(object setting)
+    {
+        settingBeforeEdit = new(((Setting)setting).settingName, ((Setting)setting).settingValue);
+    }
+
+    //when you press the checkmark to actually update it
+    private void ItemHasBeenCommitted(object setting)
+    {
+        Setting Setting = (Setting)setting;
+
+
+        if (Setting.settingName == "Email") 
+        {
+            // if its an email we have to unverify and send a new request and all that
+            UpdateEmail(Profile, Setting.settingValue);
+        }
+        else
+        {
+            //otherwise just update it
+            databaseService.UpdateUserByProperty(Profile.Id, Setting.settingName, Setting.settingValue);
+        }
+
+        if (AccountId == null) 
+        {
+            //if you're editing your own profile, you need to clear the session by logging out
+            navManager.NavigateTo("/logout");
+        }
+    }
+
+    private async Task UpdateEmail(UserAccount account, string newEmail)
+    {
+        Guid verifyRequest = Guid.NewGuid();
+        //set verify request to now
+        //update the guid to something random
+        await databaseService.UpdateUser(account.Id, Email:newEmail, Verified:false, VerifyRequest: DateTime.Now, VerifiedGuid: verifyRequest);
+
+        string url = $"{navManager.BaseUri}verify/{account.Id}/{verifyRequest}";
+
+        string emailContent = $@"
+        <div style='font-family: Arial, sans-serif;'>
+            <h2>Verify Your New Email Address, {account.DisplayName}!</h2>
+            <p>We've received a request to change the email address associated with your BracketBuilder account.</p>
+            <p>To complete this change and ensure the security of your account, please verify your new email address by clicking the link below:</p>
+            <p><strong>Verify Your New Email Address:</strong> <a href='{url}' style='color: #007bff; text-decoration: none;'>Verify Your Email Address</a></p>
+            <p style='font-size: 0.8em;'>Note: This verification link will expire in 24 hours.</p>
+            <p>If you didn't request this change, please contact our support team immediately.</p>
+            <p>Thank you for keeping your information up-to-date!</p>
+            <p>The BracketBuilder Team</p>
+        </div>";
+
+
+
+        // Send the email with the constructed content
+        await account.SendMail("Action Required: Verify Your New Email Address for BracketBuilder Account", emailContent);
+    }
+
+    private async Task ResetPassword(UserAccount account)
+    {
+        Guid verifyRequest = Guid.NewGuid();
+        //set verify request to now
+        //update the guid to something random
+        await databaseService.UpdateUser(account.Id, VerifyRequest: DateTime.Now, VerifiedGuid: verifyRequest);
+
+        string url = $"{navManager.BaseUri}verify/{account.Id}/{verifyRequest}";
+
+        string emailContent = $@"
+        <div style='font-family: Arial, sans-serif;'>
+            <h2>Your BracketBuilder Account Has Been Locked!</h2>
+            <p>Hi {account.Username},</p>
+            <p>We're happy to inform you that your BracketBuilder account can be unlocked!</p>
+            <p>Your account was temporarily locked due to recent changes in your email address, which required admin intervention.</p>
+            <p>To ensure the security of your account, we've initiated an unlock request, and you're receiving this email to verify your new email address and regain access to your account.</p>
+            <p>Please click the link below to verify your new email address and unlock your account:</p>
+            <p><strong>Unlock Your Account:</strong> <a href='{url}' style='color: #007bff; text-decoration: none;'>Unlock Your Account</a></p>
+            <p style='font-size: 0.8em;'>Note: This link will expire in 24 hours.</p>
+            <p>If you didn't initiate this action or need further assistance, please contact our support team immediately.</p>
+            <p>Thank you for your patience and cooperation.</p>
+            <p>The BracketBuilder Team</p>
+        </div>";
+
+
+        // Send the email with the constructed content
+        await account.SendMail("Unlock Your BracketBuilder Account", emailContent);
+    }
+
+    private void ResetItemToOriginalValues(object setting)
+    {
+        ((Setting)setting).settingName = settingBeforeEdit.settingName;
+        ((Setting)setting).settingValue = settingBeforeEdit.settingValue;
+    }
+
+    private bool FilterFunc(Setting setting)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (setting.settingName.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (setting.settingValue.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+
+}

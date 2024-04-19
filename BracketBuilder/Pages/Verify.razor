@@ -1,0 +1,75 @@
+﻿@page "/verify/{AccountIdStr}/{VerifyGuidStr}"
+
+@inject DatabaseDTOService dtoService;
+@inject IDatabaseService databaseService;
+
+
+@Output
+
+@code {
+    [Parameter]
+    public string? VerifyGuidStr { get; set; } = null;
+
+    [Parameter]
+    public string? AccountIdStr { get; set; } = null;
+
+    public RenderFragment Output = @<div>Processing...</div>;
+
+
+    public Guid? VerifyGuid => ParsingExtention.GuidTryParse(VerifyGuidStr);
+    public int? AccountId => ParsingExtention.IntTryParse(AccountIdStr);
+
+    private bool done = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        //if (done) return;
+
+
+        if (AccountId == null || VerifyGuid == null)
+        {
+            Output =@<div>Verification Data Error</div>  ;
+            return;
+        }
+
+        var userAccount = (await databaseService.GetUsersByFilter(id: (int)AccountId)).FirstOrDefault();
+        if (userAccount == null)
+        {
+            Output =@<div>Account not found!</div>   ;
+            return;
+        }
+
+        if (userAccount.VerifyGuid != VerifyGuid)
+        {
+            Output =@<div>Verification Failed!</div>   ;
+            return;
+        }
+
+        if (userAccount.Verified)
+        {
+            Output =@<div>Account verified!</div> ;
+            return;
+        }
+
+        //no request has been send, send one now
+        if (userAccount.VerifyRequest == DateTime.MinValue)
+        {
+            Output =@<div>No verification has been requested!</div>;
+            return;
+        }
+
+
+
+        // Check if the current time is after the expiration time of the verification link
+        if (DateTime.Now > userAccount.VerifyRequest.AddHours(24))
+        {
+            Output =@<div>Verification has expired!</div> ;
+            return;
+        }
+     
+        
+        done = true;
+        await databaseService.UpdateUser(userAccount.Id, Verified:true);
+        Output =@<div>Account Verified!</div>;
+    }
+}

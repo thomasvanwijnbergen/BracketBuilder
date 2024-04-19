@@ -1,0 +1,152 @@
+﻿@inject ISnackbar snackBar;
+@inject DatabaseDTOService dtoService;
+@inject IDatabaseService databaseService;
+@inject CommunicationService commService;
+
+
+<MudDialog style="max-width:1000px; width:100% !important;">
+    <DialogContent>
+        <div class="d-flex flex-row" style="width:900px;">
+            <div class="w-40">
+                <AccountTable @ref="UsersTable" Accounts="exceptJoinedUsers" Title="All Users" />
+            </div>
+            <div class="middle">
+                <div class="d-flex flex-column gap-5" >
+                    <MudTooltip Delay="800" Text="Move selected players into the tournament">
+                        <MudIconButton Size="Size.Large" Icon="@Icons.Material.Filled.KeyboardDoubleArrowRight" OnClick="MoveIntoToTournament" />
+                    </MudTooltip>
+                    <MudTooltip Delay="800" Text="Move selected players out of the tournament">
+                        <MudIconButton Size="Size.Large" Icon="@Icons.Material.Filled.KeyboardDoubleArrowLeft" OnClick="MoveOutOfTournament"/>
+                    </MudTooltip>
+                </div>
+            </div>
+            <div class="w-40">
+                <AccountTable @ref="TournamentTable" Accounts="joinedUsers" Title="Users in Tournament" />
+            </div>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="Cancel">Cancel and Close</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="Save">Save Changes</MudButton>
+        <MudFocusTrap />
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance? MudDialog { get; set; }
+
+    [Parameter]
+    public Tournament CurrentTournament { get; set; }
+
+    private AccountTable? UsersTable { get; set; }
+    private AccountTable? TournamentTable { get; set; }
+
+    private List<UserAccount> AllUsers = new List<UserAccount>();
+
+    private List<UserAccount> joinedUsers = new List<UserAccount>();
+    private List<UserAccount> exceptJoinedUsers = new List<UserAccount>();
+
+    private bool HasPlayersSelected(AccountTable? Table, out int selectedCount)
+    {
+        // Get the count of selected accounts
+        selectedCount = Table?.selectedAccounts?.Count() ?? 0;
+
+        // Check if no accounts are selected
+        if (selectedCount == 0)
+        {
+            snackBar.Add("No users selected. Please select at least one user to add/remove to the tournament.", Severity.Warning);
+            return false;
+        }
+        return true;
+    }
+
+    private void MoveIntoToTournament()
+    {
+        if (!HasPlayersSelected(UsersTable, out int selectedCount)) return;
+
+        // Check if adding selected accounts exceeds the maximum allowed players
+        int newAmount = joinedUsers.Count() + selectedCount;
+        if (newAmount > CurrentTournament.MaxPlayers)
+        {
+            snackBar.Add($"The tournament can only have a maximum of {CurrentTournament.MaxPlayers} players. You selected {selectedCount} additional users, which exceeds this limit.", Severity.Warning);
+            return;
+        }
+        MovePlayers(false);
+        clear();
+    }
+
+    private void MoveOutOfTournament()
+    {   
+        if (!HasPlayersSelected(TournamentTable, out int selectedCount)) return;
+        MovePlayers(true);
+        clear();
+    }
+
+    private void MovePlayers(bool deleteFromTournament)
+    {
+        AccountTable Table = deleteFromTournament ? TournamentTable : UsersTable;
+        foreach (var account in Table.selectedAccounts)
+        {
+            var acc = AllUsers.FirstOrDefault(a => a.Id == account.Id);
+            if (acc != null)
+            {
+                if (deleteFromTournament)
+                {
+                    joinedUsers.Remove(acc);
+                    exceptJoinedUsers.Add(acc);
+                }
+                else
+                {
+                    exceptJoinedUsers.Remove(acc);
+                    joinedUsers.Add(acc);
+                }
+            }
+        }
+        Table.searchStringField = string.Empty;
+        Table.searchString = string.Empty;
+        //Table.UpdateSearch();
+        StateHasChanged();
+    }
+
+    private void clear()
+    {
+        UsersTable.selectedAccounts = new HashSet<UserAccount>();
+        TournamentTable.selectedAccounts = new HashSet<UserAccount>();
+
+        StateHasChanged();
+    }
+
+    private async Task Save()
+    {
+        var AlreadyJoined = (await dtoService.GetPlayersByTournamentId(CurrentTournament.Id)).ToList();
+        foreach (var leftOutUser in exceptJoinedUsers)
+        {
+            await dtoService.DeleteTournamentPlayerCouple(CurrentTournament,leftOutUser);
+        }
+        foreach (var joinedUser in joinedUsers)
+        {   
+            if (!AlreadyJoined.Contains(joinedUser))
+                await dtoService.CreateTournamentPlayerCouple(CurrentTournament, joinedUser);
+        }
+
+        //update locally
+        CurrentTournament.Players = joinedUsers;
+
+
+        commService.CallRequestRefresh(CurrentTournament.Guid, false);
+        Cancel();
+    }
+
+    void Cancel() => MudDialog?.Cancel();
+
+    protected override async void OnInitialized()
+    {
+        joinedUsers = new List<UserAccount>(CurrentTournament.Players);
+
+
+        AllUsers = await databaseService.GetUsersByFilter();
+        exceptJoinedUsers = AllUsers.Except(joinedUsers).ToList();
+
+    }
+}

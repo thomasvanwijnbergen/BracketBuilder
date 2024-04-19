@@ -1,0 +1,80 @@
+﻿@page "/tournament/{GuidStr}/view";
+
+@inject RemoteService remoteService;
+@inject IDatabaseService databaseService;
+@inject DatabaseDTOService dtoService;
+@inject NavigationManager navManager;
+@inject CommunicationService CommService;
+
+
+
+<PageTitle>
+    Tournament View
+</PageTitle>
+@if (CurrentTournament != null)
+{ 
+    <TourView2D Tournament="CurrentTournament" Control=false />
+}
+
+
+@code {
+    [Parameter]
+    public string? GuidStr { get; set; } = null;
+
+    public Guid? Guid => ParsingExtention.GuidTryParse(GuidStr);
+
+
+    public Tournament? CurrentTournament { get; set; } = null;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Guid == null)
+            navManager.NavigateTo("/tournament",true);
+
+        var tournament = (await dtoService.GetTournamentsByFilter(guid:Guid)).FirstOrDefault();
+        if(tournament != null)
+        {
+            CurrentTournament = tournament;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        remoteService.RefreshRequested += reload;
+        CommService.RefreshRequested += CommReload;
+    }
+
+    public void Dispose()
+    {
+        remoteService.RefreshRequested -= reload;
+        CommService.RefreshRequested -= CommReload;
+    }
+
+    private async void reload()
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    private async void CommReload(Guid guid,bool full)
+    {
+        try
+        {
+            if (guid == CurrentTournament?.Guid)
+            {
+                if (full)
+                    navManager.NavigateTo(navManager.Uri, true);
+                else
+                {
+                    await OnInitializedAsync();
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch { }
+    }
+}

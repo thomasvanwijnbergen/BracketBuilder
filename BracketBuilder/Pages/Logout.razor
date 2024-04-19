@@ -1,0 +1,37 @@
+﻿@page "/logout"
+@page "/logout/{base64}"
+@inject AuthenticationStateProvider authProvider
+@inject NavigationManager navManager
+@inject ISnackbar snackBar;
+
+@code{
+
+    [Parameter]
+    public string? base64 { get; set; }
+
+    public string Base64Decode(string base64EncodedData) => NavigationMenu.Base64Decode(base64EncodedData);
+
+    protected override async Task OnAfterRenderAsync(bool firstrender)
+    {
+        var authStateProvider = (AuthStateProvider)authProvider;
+        await authStateProvider.UpdateAuthenticationState(null); //logout
+        await protectedSessionStorage.DeleteAsync("user");
+
+
+        if (base64 != null)
+        {
+            var url = Base64Decode(base64);
+
+            if (url.StartsWith("http") && !url.ToLower().StartsWith(navManager.BaseUri.ToLower())) //we do not want to rediract to offsite urls
+            {
+                snackBar.Add($"Offsite url detected: redirection to \"{url}\" was blocked.", Severity.Warning);
+                return;
+            }
+
+            navManager.NavigateTo(url, true);
+            return;
+        }
+
+        navManager.NavigateTo("/", true);
+    }
+}

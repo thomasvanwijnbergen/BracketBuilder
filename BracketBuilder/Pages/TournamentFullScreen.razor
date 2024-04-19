@@ -1,0 +1,15 @@
+﻿@page "/tournament/{GuidStr}/fullscreen";
+
+@layout EmptyLayout;
+
+@inherits _LayoutUpdatableTournamentUrl;
+
+
+
+<PageTitle>
+    Tournament View
+</PageTitle>
+@if (CurrentTournament != null)
+{ 
+    <TourView2D Tournament="CurrentTournament" Control=false />
+}

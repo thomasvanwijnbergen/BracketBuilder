@@ -1,0 +1,88 @@
+﻿@page "/tournament";
+
+@inject IDatabaseService databaseService;
+@inject DatabaseDTOService dtoService;
+
+<MudPaper Class="ma-5 pa-4" Elevation="25">
+    <MudToolBar>
+        <MudIcon Icon="@Icons.Material.Filled.Search" />
+        <MudTextField Immediate="true" OnKeyUp="UpdateSearch" T="string" @bind-Value="NameFilter" Variant="Variant.Text" Label="Tournament name"></MudTextField>
+        <MudTooltip Text="@FinishedText">
+            <MudIconButton OnClick="ClickFinishedFilter" Color="@(FinishedFilter == null ? Color.Default : ((bool) FinishedFilter) ? Color.Success : Color.Error)" Icon="@Icons.Material.Filled.Flag" />
+        </MudTooltip>
+    </MudToolBar>
+</MudPaper>
+@if (Tournaments.Count() == 0) //if there are no tournaments
+{
+    <div class="d-flex flex-column align-center">
+        <MudText Typo="Typo.h1"><b>Empty</b></MudText>
+        <MudText Typo="Typo.h4">No tournaments</MudText>
+        <MudText Typo="Typo.body2"><i>There are no public tournaments availible at this moment!</i></MudText>
+    </div>
+}
+else foreach (var tournament in Tournaments)
+{
+    <CascadingValue Name="Search" Value="NameFilter">
+        <TourDetails View="tournament" />
+    </CascadingValue>
+}
+
+@code {
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount User { get; set; }
+
+    private List<Tournament> Tournaments { get; set; } = new List<Tournament>();
+
+    private string FinishedText = "Dont care if Tournament is finished or not";
+    private bool? FinishedFilter = null;
+    private string NameFilter = string.Empty;
+
+
+    private async void ClickFinishedFilter()
+    {
+        if (FinishedFilter == null)
+            FinishedFilter = true;
+        else if (FinishedFilter == true)
+            FinishedFilter = false;
+        else if (FinishedFilter == false)
+            FinishedFilter = null;
+        UpdateFinishedText();
+        await UpdateSearch();
+    }
+
+    private async void UpdateFinishedText()
+    {
+        FinishedText = FinishedFilter switch
+        {
+            null => "Dont care if Tournament is finished or not",
+            true => "Tournament must be finished",
+            false => "Tournament must NOT be finished",
+        };
+    }
+
+    private async Task UpdateSearch()
+    {
+        string? name = (string.IsNullOrWhiteSpace(NameFilter)) ? null : NameFilter;
+        //get all public tournaments
+        var publicTournaments = await dtoService.GetTournamentsByFilter(ispublic: true, finished: FinishedFilter, name: name);
+
+        if (publicTournaments != null)
+        {
+            Tournaments = new List<Tournament>();
+            Tournaments.AddRange(publicTournaments);
+            //if logged in
+            if (User != null)
+            {
+                //also add the tournaments that a private but only if you are the creator of them
+                var privateTournaments = await dtoService.GetTournamentsByFilter(ispublic: false, creatorId: User.Id, finished: FinishedFilter, name: name);
+                Tournaments.AddRange(privateTournaments);
+            }
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateSearch();
+    }
+}

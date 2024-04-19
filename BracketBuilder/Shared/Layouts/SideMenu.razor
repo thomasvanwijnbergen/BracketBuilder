@@ -1,0 +1,46 @@
+﻿@inject NavigationManager navManager
+<MudDrawer Breakpoint="Breakpoint.Md"
+           Class="side-menu"
+           Elevation="2"
+           Open="_open"
+           Style="overflow:hidden"
+           Variant="@DrawerVariant.Mini">
+
+    <MudDrawerHeader Class="align-center d-flex align-center pa-0">
+        <MudIconButton Color="@Color.Primary"
+                       Icon="@Icons.Material.Rounded.Menu"
+                       Size="Size.Large"
+                       OnClick="@OpenSideMenu" />
+
+    </MudDrawerHeader>
+    
+    <NavigationMenu />
+
+    <MudSpacer />
+    @if (_open)
+    {
+        <div class="d-flex">
+            <MudSpacer />
+            <MudImage Alt="Logo" Src="logo.png" Width="100" Class="mb-4"></MudImage>
+            <MudSpacer />
+        </div>
+    }
+    else
+    {
+        <MudText Typo="Typo.overline" Align="Align.Center">BB</MudText>
+    }
+</MudDrawer>
+
+@code {
+
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount User { get; set; }
+
+    bool _open = false;
+
+    void OpenSideMenu()
+    {
+        _open = !_open;
+    }
+
+}

@@ -1,0 +1,767 @@
+﻿@inject IDatabaseService databaseService;
+@inject ISnackbar snackBar;
+@inject IJSRuntime JSRuntime;
+@inject IDialogService dialogService;
+@inject RemoteService remoteService;
+@inject CommunicationService commService;
+@inject DatabaseDTOService dtoService;
+@using BlafettisLib;
+
+
+<style>
+/*!
+ * Responsive Tournament Bracket
+ * Copyright 2016 Jakub Hájek
+ * Licensed under MIT (https://opensource.org/licenses/MIT)
+ */
+@@font-face {
+    font-family: 'Work Sans';
+    font-style: normal;
+    font-weight: 300;
+    src: url(https://fonts.gstatic.com/s/worksans/v19/QGY_z_wNahGAdqQ43RhVcIgYT2Xz5u32KxfXBiEJow.ttf) format('truetype');
+}
+
+@@font-face {
+    font-family: 'Work Sans';
+    font-style: normal;
+    font-weight: 400;
+    src: url(https://fonts.gstatic.com/s/worksans/v19/QGY_z_wNahGAdqQ43RhVcIgYT2Xz5u32K0nXBiEJow.ttf) format('truetype');
+}
+
+@@font-face {
+    font-family: 'Work Sans';
+    font-style: normal;
+    font-weight: 600;
+    src: url(https://fonts.gstatic.com/s/worksans/v19/QGY_z_wNahGAdqQ43RhVcIgYT2Xz5u32K5fQBiEJow.ttf) format('truetype');
+}
+
+@@font-face {
+    font-family: 'Work Sans';
+    font-style: normal;
+    font-weight: 700;
+    src: url(https://fonts.gstatic.com/s/worksans/v19/QGY_z_wNahGAdqQ43RhVcIgYT2Xz5u32K67QBiEJow.ttf) format('truetype');
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+
+.container {
+    /*width: 90%;*/
+    min-width: 18em;
+    margin: 20px;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.tournament-bracket {
+    display: flex;
+    flex-direction: column;
+}
+
+@@media (min-width: 38em) {
+    .tournament-bracket {
+        flex-direction: row;
+    }
+}
+
+.tournament-bracket__round {
+    display: block;
+    margin-left: -3px;
+    flex: 1;
+}
+
+.tournament-bracket__round-title {
+    color: var(--mud-palette-text-primary);
+    font-size: 0.95rem;
+    font-weight: 400;
+    text-align: center;
+    font-style: italic;
+    margin-bottom: 0.5em;
+}
+
+.tournament-bracket__list {
+    display: flex;
+    flex-direction: column;
+    flex-flow: row wrap;
+    justify-content: center;
+    height: 100%;
+    min-height: 100%;
+    padding-bottom: 2em;
+    margin-bottom: 2em;
+    transition: padding 0.2s ease-in-out, margin 0.2s ease-in-out;
+}
+
+@@media (max-width: 24em) {
+    .tournament-bracket__list {
+        padding-bottom: 1em;
+        margin-bottom: 1em;
+    }
+}
+
+@@media (min-width: 38em) {
+    .tournament-bracket__list {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: 0;
+    }
+}
+
+.tournament-bracket__round:last-child .tournament-bracket__list {
+    border: 0;
+}
+
+.tournament-bracket__item {
+    display: flex;
+    flex: 0 1 auto;
+    justify-content: center;
+    flex-direction: column;
+    align-items: flex-start;
+    position: relative;
+    padding: 2% 0;
+    width: 48%;
+    transition: padding 0.2s linear;
+}
+
+.tournament-bracket__firstitem {
+    display: flex;
+    flex: 0 1 auto;
+    justify-content: center;
+    flex-direction: column;
+    align-items: flex-start;
+    position: relative;
+    padding: 2% 0;
+    width: 48%;
+    transition: padding 0.2s linear;
+}
+
+    .tournament-bracket__firstitem:nth-child(@(ChildAmount)n+1) {
+        margin-right: 2%;
+    }
+    .tournament-bracket__item:nth-child(2n+1) {
+        margin-right: 2%;
+    }
+
+    .tournament-bracket__firstitem:nth-child(@(ChildAmount)n) {
+        margin-left: 2%;
+    }
+    .tournament-bracket__item:nth-child(2n) {
+        margin-left: 2%;
+    }
+
+    .tournament-bracket__item::after {
+        transition: width 0.2s linear;
+    }
+
+    .tournament-bracket__firstitem::after {
+        transition: width 0.2s linear;
+    }
+
+@@media (max-width: 24em) {
+    .tournament-bracket__item {
+        width: 100%;
+    }
+
+        .tournament-bracket__firstitem {
+            width: 100%;
+        }
+
+        .tournament-bracket__firstitem:nth-child(@(ChildAmount)n+1),
+        .tournament-bracket__firstitem:nth-child(@(ChildAmount)n) {
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .tournament-bracket__item:nth-child(2n+1),
+        .tournament-bracket__item:nth-child(2n) {
+            margin-left: 0;
+            margin-right: 0;
+        }
+
+}
+
+@@media (min-width: 38em) {
+    .tournament-bracket__item {
+        padding: 0.5em 1em;
+        width: 100%;
+    }
+
+        .tournament-bracket__firstitem {
+            padding: 0.5em 1em;
+            width: 100%;
+        }
+
+        .tournament-bracket__firstitem:nth-child(@(ChildAmount)n+1),
+        .tournament-bracket__firstitem:nth-child(@(ChildAmount)n) {
+            margin: 0;
+        }
+        .tournament-bracket__item:nth-child(2n+1),
+        .tournament-bracket__item:nth-child(2n) {
+            margin: 0;
+        }
+
+        .tournament-bracket__item::after {
+            position: absolute;
+            right: 0;
+            content: '';
+            display: block;
+            width: 1em;
+            height: 45%;
+            border-right: 2px solid #9e9e9e;
+        }
+
+        .tournament-bracket__firstitem::after {
+            position: absolute;
+            right: 0;
+            content: '';
+            display: block;
+            width: 1em;
+            height: 45%;
+            border-right: 2px solid #9e9e9e;
+        }
+
+        .tournament-bracket__firstitem:nth-child(@(ChildAmount)n+1)::after {
+            top: 50%;
+            border-top: 2px solid #9e9e9e;
+            transform: translateY(-1px);
+        }
+        .tournament-bracket__item:nth-child(2n+1)::after {
+            top: 50%;
+            border-top: 2px solid #9e9e9e;
+            transform: translateY(-1px);
+        }
+
+    .tournament-bracket--rounded .tournament-bracket__firstitem:nth-child(@(ChildAmount)n+1)::after {
+        border-top-right-radius: 0.6em;
+    }
+    .tournament-bracket--rounded .tournament-bracket__item:nth-child(2n+1)::after {
+        border-top-right-radius: 0.6em;
+    }
+
+    .tournament-bracket__firstitem:nth-child(@(ChildAmount)n)::after {
+        bottom: 50%;
+        border-bottom: 2px solid #9e9e9e;
+        transform: translateY(1px);
+    }
+    .tournament-bracket__item:nth-child(2n)::after {
+        bottom: 50%;
+        border-bottom: 2px solid #9e9e9e;
+        transform: translateY(1px);
+    }
+
+    .tournament-bracket--rounded .tournament-bracket__firstitem:nth-child(@(ChildAmount)n)::after {
+        border-bottom-right-radius: 0.6em;
+    }
+    .tournament-bracket--rounded .tournament-bracket__item:nth-child(2n)::after {
+        border-bottom-right-radius: 0.6em;
+    }
+
+    .tournament-bracket__round:first-child .tournament-bracket__item {
+        padding-left: 0;
+    }
+        .tournament-bracket__round:first-child .tournament-bracket__firstitem {
+            padding-left: 0;
+        }
+
+    .tournament-bracket__round:last-child .tournament-bracket__item {
+        padding-right: 0;
+    }
+        .tournament-bracket__round:last-child .tournament-bracket__firstitem {
+            padding-right: 0;
+        }
+
+        .tournament-bracket__round:last-child .tournament-bracket__item::after {
+            display: none;
+        }
+
+        .tournament-bracket__round:last-child .tournament-bracket__firstitem::after {
+            display: none;
+        }
+}
+
+@@media (min-width: 72em) {
+    .tournament-bracket__item {
+        padding: 0.5em 1.5em;
+    }
+
+        .tournament-bracket__firstitem {
+            padding: 0.5em 1.5em;
+        }
+
+        .tournament-bracket__item::after {
+            width: 1.5em;
+        }
+
+        .tournament-bracket__firstitem::after {
+            width: 1.5em;
+        }
+}
+
+.tournament-bracket__match {
+    display: flex;
+    width: 100%;
+    padding: 1em;
+    transition: padding 0.2s ease-in-out, border 0.2s linear;
+}
+
+    .tournament-bracket__match::before,
+    .tournament-bracket__match::after {
+        transition: all 0.2s linear;
+    }
+
+@@media (max-width: 24em) {
+    .tournament-bracket__match {
+        padding: 0.75em 0.5em;
+    }
+}
+
+@@media (min-width: 38em) {
+    .tournament-bracket__match::before,
+    .tournament-bracket__match::after {
+        position: absolute;
+        left: 0;
+        z-index: 1;
+        content: '';
+        display: block;
+        width: 1em;
+        height: 10%;
+        border-left: 2px solid #9e9e9e;
+    }
+
+    .tournament-bracket__match::before {
+        bottom: 50%;
+        border-bottom: 2px solid #9e9e9e;
+        transform: translate(0, 1px);
+    }
+
+    .tournament-bracket--rounded .tournament-bracket__match::before {
+        border-bottom-left-radius: 0.6em;
+    }
+
+    .tournament-bracket__match::after {
+        top: 50%;
+        border-top: 2px solid #9e9e9e;
+        transform: translate(0, -1px);
+    }
+
+    .tournament-bracket--rounded .tournament-bracket__match::after {
+        border-top-left-radius: 0.6em;
+    }
+}
+
+@@media (min-width: 72em) {
+    .tournament-bracket__match::before,
+    .tournament-bracket__match::after {
+        width: 1.5em;
+    }
+
+    .tournament-bracket__match::before {
+        transform: translate(0, 1px);
+    }
+
+    .tournament-bracket__match::after {
+        transform: translate(0, -1px);
+    }
+}
+
+.tournament-bracket__round:first-child .tournament-bracket__match::before,
+.tournament-bracket__round:first-child .tournament-bracket__match::after {
+    display: none;
+}
+
+.tournament-bracket__content {
+    display: flex;
+}
+
+    .tournament-bracket__content::after {
+        content: ':';
+        width: 1em;
+        text-align: center;
+        padding: 0.2em 0.1em;
+    }
+
+@@media (min-width: 38em) {
+    .tournament-bracket__content::after {
+        order: 1;
+    }
+}
+
+.tournament-bracket__content .tournament-bracket__team:first-child {
+    width: 50%;
+    order: 0;
+    text-align: right;
+}
+
+@@media (min-width: 38em) and (max-width: 52em) {
+    .tournament-bracket__content .tournament-bracket__team:first-child {
+        align-items: flex-end;
+    }
+}
+
+.tournament-bracket__content .tournament-bracket__team:first-child .tournament-bracket__country {
+    order: 2;
+    justify-content: flex-end;
+}
+
+@@media (min-width: 24em) {
+    .tournament-bracket__content .tournament-bracket__team:first-child .tournament-bracket__country {
+        order: 0;
+    }
+}
+
+@@media (min-width: 38em) and (max-width: 52em) {
+    .tournament-bracket__content .tournament-bracket__team:first-child .tournament-bracket__country {
+        flex-direction: column-reverse;
+        align-items: flex-end;
+    }
+}
+
+.tournament-bracket__content .tournament-bracket__team:first-child .tournament-bracket__score {
+    order: 0;
+}
+
+@@media (min-width: 24em) {
+    .tournament-bracket__content .tournament-bracket__team:first-child .tournament-bracket__score {
+        order: 2;
+    }
+}
+
+.tournament-bracket__content .tournament-bracket__team:last-child {
+    width: 50%;
+    order: 2;
+    text-align: left;
+}
+
+@@media (min-width: 38em) and (max-width: 52em) {
+    .tournament-bracket__content .tournament-bracket__team:last-child {
+        align-items: flex-start;
+    }
+}
+
+@@media (min-width: 38em) {
+    .tournament-bracket__content .tournament-bracket__team:last-child .tournament-bracket__country {
+        justify-content: flex-start;
+    }
+}
+
+@@media (min-width: 38em) and (max-width: 52em) {
+    .tournament-bracket__content .tournament-bracket__team:last-child .tournament-bracket__country {
+        align-items: flex-start;
+    }
+}
+
+.tournament-bracket__content .tournament-bracket__team:last-child .tournament-bracket__code {
+    order: 1;
+}
+
+.tournament-bracket__table {
+    width: 100%;
+}
+
+.tournament-bracket__caption {
+    font-size: 0.8rem;
+    color: var(--mud-palette-text-primary);
+    font-weight: 300;
+    padding-bottom: 0.75em;
+}
+
+.tournament-bracket__team {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: space-between;
+}
+
+@@media (min-width: 24em) {
+    .tournament-bracket__team {
+        flex-direction: column-reverse;
+    }
+}
+
+@@media (min-width: 38em) {
+    .tournament-bracket__team {
+        flex-direction: column-reverse;
+    }
+}
+
+.tournament-bracket__country {
+    font-size: 0.95rem;
+    display: flex;
+    margin-top: 0.5em;
+    align-items: center;
+}
+
+@@media (max-width: 24em) {
+    .tournament-bracket__country {
+        margin-top: 0;
+    }
+}
+
+@@media (min-width: 38em) and (max-width: 52em) {
+    .tournament-bracket__country {
+        display: flex;
+        flex-direction: column;
+    }
+
+        .tournament-bracket__country .tournament-bracket__code {
+            margin-top: 0.2em;
+        }
+}
+
+.tournament-bracket__code {
+    padding: 0 0.5em;
+    color: var(--mud-palette-text-primary);
+    font-weight: 600;
+    text-transform: uppercase;
+    border: 0;
+    text-decoration: none;
+    cursor: help;
+    transition: padding 0.2s ease-in-out;
+}
+
+@@media (max-width: 24em) {
+    .tournament-bracket__code {
+        padding: 0 0.25em;
+    }
+}
+
+@@media (min-width: 38em) and (max-width: 52em) {
+    .tournament-bracket__code {
+        padding: 0;
+    }
+}
+
+.tournament-bracket__score {
+    display: flex;
+    align-items: center;
+}
+
+.tournament-bracket__team:first-child .tournament-bracket__score {
+    flex-direction: row-reverse;
+    padding-left: 0.75em;
+}
+
+.tournament-bracket__team:last-child .tournament-bracket__score {
+    padding-right: 0.75em;
+}
+
+.tournament-bracket__number {
+    display: inline-block;
+    padding: 0.2em 0.4em 0.2em;
+    border-bottom: 0.075em solid transparent;
+    font-size: 0.95rem;
+    background-color: #F5F5F5;
+    border-color: #dddddd;
+}
+
+.tournament-bracket__medal {
+    padding: 0 0.5em;
+}
+
+.tournament-bracket__medal--gold {
+    color: #FFD700;
+}
+
+.tournament-bracket__medal--silver {
+    color: #C0C0C0;
+}
+
+.tournament-bracket__medal--bronze {
+    color: #CD7F32;
+}
+
+</style>
+
+<CascadingValue Name="HideBadge" Value="true">
+    <div class="d-flex flex-column">
+        <div class="d-flex align-content-center">
+        @if (Tournament != null)
+        {
+            <MudText Typo="Typo.caption" Style="opacity:.7;" Class="mx-auto">@Tournament.Name</MudText>
+        }
+        </div>
+        <div>
+            @if (Tournament.FinalMatch != null)
+            {
+                TournamentMatches.Clear();
+                if (Tournament.FinalMatch != null)
+                {
+                    AddChilderen(Tournament.FinalMatch);
+                }
+                if (Order)
+                {
+                    <TournamentOrderer Control="Control" Tournament="Tournament" TournamentMatches="TournamentMatches" />
+                }
+                else
+                {
+                    <TournamentRenderer @ref="renderer" Control="Control" Tournament="Tournament" TournamentMatches="TournamentMatches" />
+                }
+            }
+        </div>
+    </div>
+</CascadingValue>
+@code {
+    [Parameter]
+    public Tournament Tournament { get; set; }
+
+    [Parameter]
+    public bool Control { get; set; }
+
+    [Parameter]
+    public bool Order { get; set; }
+
+
+
+    public TournamentRenderer renderer { get; set; }
+
+
+    public int ChildAmount => (Tournament == null) ? 2 : Tournament.AmountOfMatchesInPool;
+    /// <summary>
+    /// A collection of ALL matches in every match
+    /// </summary>
+    private List<Match> TournamentMatches = new List<Match>();
+
+    private void AddChilderen(Match match)
+    {
+        TournamentMatches.AddRange(match.Children);
+        foreach (var child in match.Children)
+        {
+            AddChilderen(child);
+        }
+        if (match.Parent == null)
+            TournamentMatches.Add(match);
+    }
+
+    public async Task ClearScoreForAll()
+    {
+        List<Player> AllPlayers = new List<Player>();
+        foreach (var match in TournamentMatches)
+        {
+            AllPlayers.AddRange(match.Competitors.Except(AllPlayers));
+        }
+
+        foreach (var player in AllPlayers)
+        {
+            player.Score = 0;
+        }
+        await dtoService.BulkUpdateMatchPlayercouples(AllPlayers);
+
+        snackBar.Add("All scores have been cleared!", Severity.Success);
+    }
+    /// <summary>
+    /// If tournament is finished the seeding will update
+    /// </summary>
+    /// <returns></returns>
+    public async Task FinishTournamentSeedingUpdate()
+    {
+        UserAccount First = null;
+        UserAccount Second = null;
+        UserAccount Third = null;
+
+        List<Player> AllPlayers = new List<Player>();
+        foreach (var match in TournamentMatches)
+        {
+            AllPlayers.AddRange(match.Competitors.Except(AllPlayers));
+        }
+        bool useScore = Tournament.FinalMatch.Competitors.TrueForAll(c => c.Score > 0);
+        if (useScore)
+            AllPlayers.OrderBy(p => (p.Position * 100000) + (p.Score * 1000) + (p.Account.AmoutOfTimesInFinal * 10) + p.Account.AmoutOfWonMatches);
+        else
+            AllPlayers.OrderBy(p => (p.Position * 100000) + (p.Account.AmoutOfTimesInFinal * 10) + p.Account.AmoutOfWonMatches);
+
+        foreach (var player in AllPlayers)
+        {
+            player.Account.AmountOfCompetedTournaments += 1;
+            player.Account.AmoutOfWonMatches += player.Position - 1;
+
+            if (player.Winner)
+            {
+                player.Account.AmountOfWonTournaments += 1;
+                First = player.Account;
+            }
+            if (player.Position == Tournament.FinalMatch.Position)
+            {
+                if (First == null || First == player.Account)
+                {
+                    First = player.Account;
+                }
+                else if (Second == null)
+                {
+                    Second = player.Account;
+                }
+                else if (Third == null)
+                {
+                    Third = player.Account;
+                }
+                //extra boost for getting to the final round
+                player.Account.AmoutOfTimesInFinal += 1;
+            }
+        }
+
+        Tournament.First = First;
+        Tournament.Second = Second;
+        Tournament.Third = Third;
+
+        Tournament.FinishDate = DateTime.Now;
+        Tournament.Finished = true;
+
+        await dtoService.BulkUpdateMatchPlayercouples(AllPlayers);
+        await dtoService.UpdateTournament(Tournament.Id, Tournament);
+
+        remoteService.CallRequestRefresh();
+        commService.CallRequestRefresh(Tournament.Guid, true);
+    }
+
+
+    public async Task FinishTournament()
+    {
+        //if its not yet finished, finish it
+        if (!Tournament.Finished)
+        {
+            await FinishTournamentSeedingUpdate();
+        }        
+
+        //show the results
+        var parameters = new DialogParameters();
+        parameters.Add("First", Tournament.First);
+        parameters.Add("Second", Tournament.Second);
+        parameters.Add("Third", Tournament.Third);
+        DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = false };
+        var dialog = await dialogService.ShowAsync<WinnerDialog>("Tournament has been finished", parameters, closeOnEscapeKey);
+        var result = await dialog.Result;
+
+        if (dialog.Result != null)
+        {
+            //set off confetti
+            renderer.RaiseConfetti();
+        }
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (Tournament != null)
+            {
+                if (Tournament.Finished)
+                {
+                    await Task.Delay(100);
+                    await FinishTournament();
+                }
+            }
+        }
+    }
+
+}
+

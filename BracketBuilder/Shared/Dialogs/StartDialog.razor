@@ -1,0 +1,115 @@
+﻿@inject IDatabaseService databaseService;
+@inject ISnackbar snackBar;
+@inject IDialogService dialogService;
+@inject DatabaseDTOService dtoService;
+@inject RemoteService remoteService;
+@inject CommunicationService commService;
+
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex flex-column gap-3">
+            <MudContainer Class="d-flex flex-column">
+                <MudText>Amount of players per match</MudText>
+                <MudNumericField Label="Amount of players per match" T="int" @bind-Value="Tournament.AmountOfPlayerInMatch" Min="1" Max="25"></MudNumericField>
+            </MudContainer>
+            <MudContainer Class="d-flex flex-column">
+                <MudCheckBox @bind-Checked="Advanced">Advanced</MudCheckBox>
+            </MudContainer>
+            @if (Advanced)
+            {
+                <MudContainer Class="d-flex flex-column">
+                    <MudText>Always allow room for every child to atleast pass 1 player</MudText>
+                    <MudText Typo="Typo.subtitle2" Style="opacity:0.5;">only applies when Amount of players per mach is lower than the amount of starting matches that go into a next match</MudText>
+                    <MudCheckBox Disabled="@(Tournament.AmountOfPlayerInMatch > 4)" @bind-Checked="Tournament.AlwaysFit">AlwaysFit</MudCheckBox>
+                </MudContainer>
+                <MudContainer Class="d-flex flex-column">
+                    <MudText>Amount of minimal starting matches</MudText>
+                    <MudRadioGroup @bind-SelectedOption="AutomaticStarting">
+                        <MudRadio Option="true" Color="Color.Primary" Dense="true">Automatic</MudRadio>
+                        <MudRadio Option="false" Color="Color.Secondary" Dense="false">Manual</MudRadio>
+                    </MudRadioGroup>
+                </MudContainer>
+                @if (!AutomaticStarting)
+                {
+                    <MudContainer Class="d-flex flex-column">
+                        <MudNumericField Label="Amount Starting Matches" T="int" @bind-Value="Tournament.AmountStart"></MudNumericField>
+                    </MudContainer>
+                }
+                <MudContainer Class="d-flex flex-column">
+                    <MudText>Amount of matches into next round</MudText>
+                    <MudRadioGroup @bind-SelectedOption="AutomaticGoingToNextRound">
+                        <MudRadio Option="true" Color="Color.Primary" Dense="true">Automatic</MudRadio>
+                        <MudRadio Option="false" Color="Color.Secondary" Dense="false">Manual</MudRadio>
+                    </MudRadioGroup>
+                </MudContainer>
+                @if (!AutomaticGoingToNextRound)
+                {
+                    <MudContainer Class="d-flex flex-column">
+                        <MudSelect Label="Quarter Finals Match count" T="int" @bind-Value="Tournament.AmountOfMatchesInPool">
+                            @foreach (int StartingToNextRound in Tournament.PossibleStartingToNextRound)
+                            {
+                                <MudSelectItem Value="StartingToNextRound">@StartingToNextRound</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudContainer>
+                }
+            }
+            <MudButton Color="Color.Tertiary" Variant="Variant.Outlined" OnClick="ShowUsers">Configure Players</MudButton>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="BeginTournament">Generate Bracket</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance? MudDialog { get; set; }
+
+    [Parameter]
+    public Tournament Tournament { get; set; }
+
+    [Parameter]
+    public bool Control { get; set; }
+
+    private bool AutomaticStarting { get; set; } = true;
+    private bool AutomaticGoingToNextRound { get; set; } = true;
+    private bool Advanced { get; set; } = false;
+
+
+    public async void ShowUsers()
+    {
+        if (Tournament.Players == null)
+            snackBar.Add("No player",Severity.Error);
+
+        var parameters = new DialogParameters();
+
+        parameters.Add("CurrentTournament", Tournament);
+
+        DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = true, DisableBackdropClick = true };
+
+        var dialog = dialogService.Show<TournamentUsersViewDialog>("View users", parameters, closeOnEscapeKey);
+    }
+
+    void Cancel() => MudDialog?.Cancel();
+
+
+    public async void BeginTournament()
+    {
+        try
+        {
+            int? finalMatchId = Tournament?.FinalMatch?.Id;
+            if (finalMatchId == null) finalMatchId = -2;
+            Tournament.Build(AutomaticStarting, AutomaticGoingToNextRound);
+            await dtoService.UpdateTournament(Tournament.Id,Tournament,finalMatchId);
+            remoteService.CallRequestRefresh();
+            commService.CallRequestRefresh(Tournament.Guid,true);
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add(ex.Message,Severity.Error);
+        }
+        Cancel();
+    }
+}

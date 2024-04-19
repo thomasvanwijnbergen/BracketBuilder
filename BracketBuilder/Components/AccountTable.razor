@@ -1,0 +1,84 @@
+﻿<MudTable
+          T="UserAccount"
+          Height="400"
+          FixedFooter="true"
+          FixedHeader="true"
+          Items="Accounts"
+          Virtualize="true"
+          Dense="true"
+          Filter="new Func<UserAccount,bool>(FilterFunc)"
+          MultiSelection="true"
+          SelectOnRowClick="false"
+          @bind-SelectedItems="selectedAccounts"
+          RowsPerPage="200"
+          SelectedItem="null">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">@($"{Title} ({selectedAccounts.Count()}/{Accounts.Count()})")</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="searchStringField" OnKeyUp="UpdateSearch" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Avatar</MudTh>
+        <MudTh>Display name</MudTh>
+        <MudTh>Username</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Avatar">
+            <Avatar Account="@context" showName="false" small="true"/>
+        </MudTd>
+        <MudTd DataLabel="Display name">@context.DisplayName</MudTd>
+        <MudTd DataLabel="Username">@context.Username</MudTd>
+    </RowTemplate>
+    <PagerContent>
+        @*<MudTablePager />*@
+    </PagerContent>
+</MudTable>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "All Accounts";
+
+    [Parameter]
+    public List<UserAccount> Accounts { get; set; }
+
+    public HashSet<UserAccount> selectedAccounts { get; set; } = new HashSet<UserAccount>();
+
+    public string searchString = "";
+    public string searchStringField = "";
+
+    async public void UpdateSearch()
+    {
+        // Create a copy of the current selectedTickets
+        HashSet<UserAccount> selectedAccountsCopy = new HashSet<UserAccount>(selectedAccounts);
+
+        searchString = searchStringField;
+
+        await Task.Delay(100); // await 0.1 second
+
+        // Merge the copy and the current selectedTickets, removing duplicates
+        selectedAccounts.UnionWith(selectedAccountsCopy);
+        UpdateSelection(selectedAccounts);
+    }
+
+    async public void UpdateSelection(HashSet<UserAccount> selectedRows)
+    {
+        selectedAccounts = selectedRows;
+        StateHasChanged();
+
+        // Save selected items to session storage
+        //await sessionStorage.SetItemAsync("SelectedTickets", selectedTickets);
+    }
+
+    private bool FilterFunc(UserAccount user)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (user.Username.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (user.DisplayName.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (user.Identificaton != null && user.Identificaton.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+}

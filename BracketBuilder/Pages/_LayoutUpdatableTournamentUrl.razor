@@ -1,0 +1,46 @@
+﻿@inherits _LayoutTournamentUrl;
+
+@inject RemoteService remoteService;
+@inject CommunicationService CommService;
+@inject NavigationManager navManager;
+
+@code {
+    protected override void OnInitialized()
+    {
+        remoteService.RefreshRequested += reload;
+        CommService.RefreshRequested += CommReload;
+    }
+
+    public void Dispose()
+    {
+        remoteService.RefreshRequested -= reload;
+        CommService.RefreshRequested -= CommReload;
+    }
+
+    private async void reload()
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    private async void CommReload(Guid guid, bool full)
+    {
+        try
+        {
+            if (guid == CurrentTournament?.Guid)
+            {
+                if (full)
+                    navManager.NavigateTo(navManager.Uri, true);
+                else
+                {
+                    await OnInitializedAsync();
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch { }
+    }
+}

@@ -1,0 +1,25 @@
+﻿@if (useDarkMode)
+{
+    <MudTooltip Text="Switch to light mode">
+        <MudIconButton OnClick="ChangeDarkMode" Icon="@Icons.Material.TwoTone.LightMode" Color="Color.Warning" />
+    </MudTooltip>
+}
+else
+{
+    <MudTooltip Text="Switch to dark mode">
+        <MudIconButton OnClick="ChangeDarkMode" Icon="@Icons.Material.Rounded.DarkMode" Color="@Color.Warning" />
+    </MudTooltip>
+}
+
+@code {
+    [CascadingParameter(Name = "DarkMode")]
+    public bool useDarkMode { get; set; }
+
+    [CascadingParameter(Name = "DarkModeCallback")]
+    public EventCallback DarkModeCallback { get; set; }
+
+    public async void ChangeDarkMode()
+    {
+        await DarkModeCallback.InvokeAsync();
+    }
+}

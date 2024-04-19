@@ -1,0 +1,135 @@
+﻿@using MudBlazor.Utilities;
+@inherits LayoutComponentBase;
+@layout MainLayout;
+@inject NavigationManager navManager;
+@inject DatabaseDTOService dtoService;
+
+<MudAppBar Style="@(loaded ? "":"background: #FFFFFF;")">
+    @if (!IsMedium)
+    {
+        <MudLink Href="/" Underline="Underline.None" Color="Color.Default" Style="width:14%; user-select:none;">
+            BracketBuilder
+        </MudLink>
+    }
+
+    <MediaQuery Media="@Breakpoints.MediumDown" @bind-Matches="IsMedium" />
+
+
+
+    @{var uri = new Uri(navManager.Uri);}
+
+    @if (uri.Segments.Count() > 3)
+    {
+        var guidString = uri.Segments[^2].Replace("/", ""); // Get the last segment from the URL
+        if (Guid.TryParse(guidString, out var parsedGuid))
+        {
+            tournamentGuid = parsedGuid;
+            var tournament = dtoService.GetTournamentsByFilter(guid:tournamentGuid);
+            <ul class="mud-breadcrumbs mud-typography-body1">
+                <li class="mud-breadcrumb-item">
+                    @{
+                        string color = "rgba(0,200,83,1)";
+                        if (useDarkMode)
+                            color = "rgba(11,186,131,1)";
+                    }
+                    <a style="color:@color;">
+                        <MudIcon Icon="@Icons.Material.Filled.Flag" Size="Size.Small" />
+                        @{
+                            string? name = "[Not found]";
+                            var list = tournament?.GetAwaiter().GetResult();
+                            if (list != null && list.Count() > 0)
+                            {
+                                name = list?.First()?.Name;
+                            }
+                        }
+                        @name
+                    </a>
+                </li>
+                <li aria-hidden="true" class="mud-breadcrumb-separator mud-ltr mud-flip-x-rtl"><span>/</span></li>
+                @foreach (var Item in _items)
+                {
+
+                    @if ((Item?.Href != "/control" && Item?.Href != "/update") || (User != null && User.HasAccess))
+                    {
+                        <li class="mud-breadcrumb-item">
+                            <a href="@($"/tournament/{tournamentGuid}{Item?.Href}" ?? "#")">
+                                @if (Item?.Icon != null)
+                                {
+                                    <MudIcon Icon="@Item?.Icon" Size="Size.Small" />
+                                }
+                                @Item?.Text
+                            </a>
+                        </li>
+                        if (Item != _items.Last())
+                        {
+                            <li aria-hidden="true" class="mud-breadcrumb-separator mud-ltr mud-flip-x-rtl">
+                                <span>
+                                or
+                                </span>
+                            </li>
+                        }
+                    }
+                }
+            </ul>
+        }
+    }
+
+    <MudSpacer />
+
+    <AuthorizeView>
+        <Authorized>
+            @if (User != null)
+            {
+                <Avatar Clickable="false" showName=false Account="User"/>
+                <MudLink Color="Color.Default" Href=@($"/profile/{User.Id}") OnClick=@(() => navManager.NavigateTo($"/profile/{User.Id}",true)) Class="mx-4">@User.Username</MudLink>
+            }
+        </Authorized>
+        <NotAuthorized>
+            <MudAvatar>?</MudAvatar>
+            <MudText Class="mx-4">Guest</MudText>
+        </NotAuthorized>
+    </AuthorizeView>
+
+    <DarkModeSwitch />
+
+    <MudDivider Class="mx-6 " DividerType="DividerType.Middle" Style="width: 2px; max-height: 40px;" Vertical="true" />
+    <AuthorizeView>
+        <Authorized>
+            <MudButton Style="width:7%;" OnClick="() => NavigationMenu.Logout(navManager)">LOGOUT</MudButton>
+        </Authorized>
+        <NotAuthorized>
+            <MudButton Style="width:7%;" OnClick="() => NavigationMenu.Login(navManager)">LOGIN</MudButton>
+        </NotAuthorized>
+    </AuthorizeView>
+</MudAppBar>
+<SideMenu />
+<MudMainContent>
+    <div class="mt-5 ml-5">
+        @Body
+    </div>
+</MudMainContent>
+
+@code {
+    [CascadingParameter(Name = "loadedLAYOUT")]
+    public bool loaded { get; set; }
+    [CascadingParameter(Name = "DarkMode")]
+    public bool useDarkMode { get; set; }
+    [CascadingParameter(Name = "AuthSession")]
+    public bool loggedIn { get; set; }
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount? User { get; set; }
+
+    private bool IsMedium { get; set; }
+
+    private List<BreadcrumbItem> _items = new List<BreadcrumbItem>
+    {
+        new BreadcrumbItem("Control", href: "/control", icon: Icons.Material.Filled.AdminPanelSettings),
+        new BreadcrumbItem("Edit", href: "/update", icon: Icons.Material.Filled.Update),
+        new BreadcrumbItem("Detail", href: "/detail", icon: Icons.Material.Filled.Info),
+        new BreadcrumbItem("View", href: "/view", icon: Icons.Material.Filled.Search),
+        new BreadcrumbItem("Fullscreen", href: "/fullscreen", icon: Icons.Material.Filled.SavedSearch),
+    };
+
+    private Guid tournamentGuid;
+
+}

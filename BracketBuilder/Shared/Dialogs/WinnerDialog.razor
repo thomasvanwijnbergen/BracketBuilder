@@ -1,0 +1,86 @@
+﻿@using BlafettisLib;
+
+<MudDialog Class="overflow-hidden">
+    <DialogContent>
+        <div @onclick="Celebrate" class="d-flex align-end">
+            <Blafettis angle="60" width="@width" height="@height" spread="@spread" stagger="@stagger" elementCount="@elementCount" duration="@duration" dragFriction="@dragFriction" startVelocity="@startVelocity" @ref="blafettis1" />
+            <div style="width: 200px;">
+                <div style="text-align: center; padding: 5px .5rem;">
+                    <Avatar small="null" showName="false" Account="Second" />
+                </div>
+                <MudPaper Square="true" Class="@($"d-flex flex-column flex-wrap justify-center align-content-center {Avatar.UsernameToTheme(Second?.Username)}")" Style="min-height: 200px; text-align:center; user-select:none;">
+                    <MudText Typo="Typo.h2">2</MudText>
+                    <MudText Style="opacity: .5;" Typo="Typo.h5">@SecondName</MudText>
+                </MudPaper>
+            </div>
+            <div style="width: 200px;">
+                <div style="text-align: center; padding: 5px .5rem;">
+                    <Avatar small="null" showName="false" Account="First" />
+                </div>
+                <MudPaper Square="true" Class="@($"d-flex flex-column flex-wrap justify-center align-content-center {Avatar.UsernameToTheme(First?.Username)}")" Style="min-height: 300px; text-align:center; user-select:none;">
+                    <MudText Typo="Typo.h1">1</MudText>
+                    <MudText Style="opacity: .5;" Typo="Typo.h4">@FirstName</MudText>
+                </MudPaper>
+            </div>
+            <div style="width: 200px;">
+                <div style="text-align: center; padding: 5px .5rem;">
+                    <Avatar small="null" showName="false" Account="Third" />
+                </div>
+                <MudPaper Square="true" Class="@($"d-flex flex-column flex-wrap justify-center align-content-center {Avatar.UsernameToTheme(Third?.Username)}")" Style="min-height: 100px; text-align:center; user-select:none;">
+                    <MudText Typo="Typo.h3">3</MudText>
+                    <MudText Style="opacity: .5;" Typo="Typo.h6">@ThirdName</MudText>
+                </MudPaper>
+            </div>
+            <Blafettis angle="120" width="@width" height="@height" spread="@spread" stagger="@stagger" elementCount="@elementCount" duration="@duration" dragFriction="@dragFriction" startVelocity="@startVelocity" @ref="blafettis2" />
+        </div>
+    </DialogContent>
+</MudDialog>
+
+
+@code {
+    [Parameter]
+    public UserAccount First { get; set; } = null;
+
+    [Parameter]
+    public UserAccount Second { get; set; } = null;
+
+    [Parameter]
+    public UserAccount Third { get; set; } = null;
+
+    public string FirstName => First == null ? "Empty" : First.DisplayName;
+    public string SecondName => Second == null ? "Empty" : Second.DisplayName;
+    public string ThirdName => Third == null ? "Empty" : Third.DisplayName;
+
+
+
+    private string width = "15px";
+    private string height = "15px";
+    private int spread = 69;
+    private int stagger = 10;
+    private int elementCount = 200;
+    private int duration = 3000;
+    private double dragFriction = 0.15;
+    private int startVelocity = 50;
+
+
+    protected Blafettis blafettis1;  // get the reference
+    protected Blafettis blafettis2;  // get the reference
+
+    private void Celebrate()
+    {
+        if (blafettis1 != null)
+            blafettis1.RaiseConfetti();  // raise confetti via method
+        if (blafettis2 != null)
+            blafettis2.RaiseConfetti();  // raise confetti via method
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Task.Delay(100);
+            Celebrate();
+        }
+        //return await base.OnAfterRenderAsync(firstRender);
+    }
+}

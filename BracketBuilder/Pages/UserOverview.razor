@@ -1,0 +1,100 @@
+﻿@page "/users"
+@inject IDatabaseService databaseService;
+@inject DatabaseDTOService dtoService;
+@inject NavigationManager navManager;
+
+<h3>All Users</h3>
+<MudPaper Class="ma-5 pa-4" Elevation="25">
+    <MudToolBar>
+        <MudIcon Icon="@Icons.Material.Filled.Search" />
+        <MudTextField Immediate="true" OnKeyUp="UpdateSearch" T="string" @bind-Value="NameFilter" Variant="Variant.Text" Label="UserAccount"></MudTextField>
+        <MudTooltip Text="@FinishedText">
+            <MudIconButton OnClick="ClickVerifiedFilter" Color="@(VerifiedFilter == null ? Color.Default : ((bool) VerifiedFilter) ? Color.Primary : Color.Error)" Icon="@Icons.Material.Filled.VerifiedUser" />
+        </MudTooltip>
+    </MudToolBar>
+</MudPaper>
+<CascadingValue Name="HideBadge" Value="true">
+    <MudPaper Class="d-flex flex-column gap-2">
+    @if (Users.Count() == 0) //if there are no users
+    {
+        <div class="d-flex flex-column align-center">
+            <MudText Typo="Typo.h1"><b>Empty</b></MudText>
+            <MudText Typo="Typo.h4">No tournaments</MudText>
+            <MudText Typo="Typo.body2"><i>There are no public tournaments availible at this moment!</i></MudText>
+        </div>
+    }
+    else foreach (var user in Users.OrderByDescending(u => u.Verified).OrderBy(u => u.Role))
+    {
+        <div class="d-flex flex-row gap-4 pa-2">
+            @{
+                Color TextColor = Color.Default;
+                if (user.Role == UserAccount.Admin) TextColor = Color.Error;
+                if (user.Role == UserAccount.Moderator) TextColor = Color.Tertiary;
+            }
+            <Avatar small="null" Account="user" showName="false" Clickable="true" />
+                    <div class="d-flex flex-column cursor-pointer" @onclick=@(() => navManager.NavigateTo($"/profile/{user.Id}"))>
+                <div class="d-flex flex-row align-center gap-2">
+                    <MudText Color="TextColor" Typo="Typo.h5"><b><MudHighlighter Class="HighlightStyle" HighlightedText="@NameFilter" Text="@user.DisplayName" /></b></MudText>
+                    @if (user.Verified)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" Size="Size.Small" Color="Color.Primary" />
+                    }
+                </div>
+                <MudText Typo="Typo.caption">@@<MudHighlighter Class="HighlightStyle" HighlightedText="@NameFilter" Text="@user.Username" /></MudText>
+            </div>
+        </div>
+    }
+    </MudPaper>
+</CascadingValue>
+
+@code {
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount User { get; set; }
+
+    private List<UserAccount> Users { get; set; } = new List<UserAccount>();
+
+    private string FinishedText = "Dont care if User is verified or not";
+    private bool? VerifiedFilter = null;
+    private string NameFilter = string.Empty;
+
+
+    private async void ClickVerifiedFilter()
+    {
+        if (VerifiedFilter == null)
+            VerifiedFilter = true;
+        else if (VerifiedFilter == true)
+            VerifiedFilter = false;
+        else if (VerifiedFilter == false)
+            VerifiedFilter = null;
+        UpdateVerifiedText();
+        await UpdateSearch();
+    }
+
+    private async void UpdateVerifiedText()
+    {
+        FinishedText = VerifiedFilter switch
+        {
+            null => "Dont care if User is verified or not",
+            true => "User must be verified",
+            false => "User must NOT be verified",
+        };
+    }
+
+    private async Task UpdateSearch()
+    {
+        string? name = (string.IsNullOrWhiteSpace(NameFilter)) ? null : NameFilter;
+        //get all public tournaments
+        var users = await databaseService.GetUsersBySearchFilter(name, name, name, name, name, verified:VerifiedFilter);
+
+        if (users != null)
+        {
+            Users = new List<UserAccount>(users);
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateSearch();
+    }
+}

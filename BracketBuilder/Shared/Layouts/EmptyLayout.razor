@@ -1,0 +1,117 @@
+﻿@inherits LayoutComponentBase;
+@layout MainLayout;
+@inject NavigationManager navManager;
+<MudPaper Elevation="25" Width="75%" Class="toolbar">
+    <MudToolBar>
+        @if (tournamentGuid != Guid.Empty)
+        {
+            <MudTooltip Text="Go back to details">
+                <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack" Href="@($"/tournament/{tournamentGuid}/detail")" Color="Color.Inherit" Class="mr-5" />
+            </MudTooltip>
+        }
+        <MudTooltip Text="Home">
+            <MudIconButton Icon="@Icons.Material.Outlined.Home" Href="/"  Color="Color.Inherit" Class="mr-5" />
+        </MudTooltip>
+        <AuthorizeView Roles="@UserAccount.Admin">
+            <Authorized>
+                @if (tournamentGuid != Guid.Empty)
+                {
+                    <MudTooltip Text="Go to control">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Href="@($"/tournament/{tournamentGuid}/control")" Color="Color.Inherit" Class="mr-5" />
+                    </MudTooltip>
+                }
+            </Authorized>
+        </AuthorizeView>
+        @if (tournamentGuid != Guid.Empty)
+        {
+            <MudTooltip Text="Go back to normal view">
+                <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Href="@($"/tournament/{tournamentGuid}/view")" Color="Color.Inherit" Class="mr-5" />
+            </MudTooltip>
+        }
+        @if (tournamentGuid != Guid.Empty)
+        {
+            <MudSpacer />
+            <MudTooltip Text="Get QR-Code">
+                <MudIconButton Icon="@Icons.Material.Filled.QrCode2" OnClick="() => visible = true" />
+            </MudTooltip>
+            <MudDialog @bind-IsVisible="visible">
+                <TitleContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Class="mr-3" /> QR-Code
+                    </MudText>
+                </TitleContent>
+                <DialogContent>
+                    <p>Scan code to view this tournament</p>
+                    <MudExtensions.MudBarcode Color="var(--mud-palette-text-primary)" BackgroundColor="var(--mud-palette-surface)" Clickable="true" BarcodeFormat="ZXing.BarcodeFormat.QR_CODE" Width="500" Height="500" Value="@($"{navManager.BaseUri}tournament/{tournamentGuid}/view")" />
+                </DialogContent>
+                <DialogActions>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => visible = false" Class="px-10">Close</MudButton>
+                </DialogActions>
+            </MudDialog>
+            <MudSpacer />
+        }
+        else
+        {
+            <MudSpacer />
+        }
+        <MudTooltip Text="Refresh">
+            <MudIconButton Icon="@Icons.Material.Outlined.Refresh" OnClick="() => navManager.NavigateTo(navManager.Uri,true)" Color="Color.Inherit" Class="mr-5" />
+        </MudTooltip>
+
+        <DarkModeSwitch />
+
+
+        <AuthorizeView>
+            <Authorized>
+                <MudTooltip Text="Logout">
+                    <MudIconButton OnClick="() => NavigationMenu.Logout(navManager)" Icon="@Icons.Material.Outlined.Logout" />
+                </MudTooltip>
+            </Authorized>
+            <NotAuthorized>
+                <MudTooltip Text="Login">
+                    <MudIconButton OnClick="() => NavigationMenu.Login(navManager)" Icon="@Icons.Material.Outlined.AccountCircle" />
+                </MudTooltip>
+            </NotAuthorized>
+        </AuthorizeView>
+    </MudToolBar>
+</MudPaper>
+<CascadingValue Name="DarkMode" Value="useDarkMode">
+    <CascadingValue Name="AuthSession" Value="loggedIn">
+        <CascadingValue Name="AuthUser" Value="User">
+            <div class="mt-1 ml-1">
+                @Body
+            </div>
+        </CascadingValue>
+    </CascadingValue>
+</CascadingValue>
+
+@code {
+    [CascadingParameter(Name = "loadedLAYOUT")]
+    public bool loaded { get; set; }
+    [CascadingParameter(Name = "DarkMode")]
+    public bool useDarkMode { get; set; }
+    [CascadingParameter(Name = "AuthSession")]
+    public bool loggedIn { get; set; }
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount User { get; set; }
+
+
+    public bool visible { get; set; }
+
+    private Guid tournamentGuid;
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(navManager.Uri);
+        if (uri.Segments.Count() > 3)
+        {
+            var guidString = uri.Segments[^2].Replace("/",""); // Get the last segment from the URL
+            if (Guid.TryParse(guidString, out var parsedGuid))
+            {
+                tournamentGuid = parsedGuid;
+                return;
+            }
+        }
+        // Handle invalid Guid
+        tournamentGuid = Guid.Empty;
+    }
+}

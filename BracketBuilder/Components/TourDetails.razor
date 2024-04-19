@@ -1,0 +1,375 @@
+﻿@inject DatabaseDTOService dtoService;
+@inject NavigationManager navManager;
+@inject RemoteService remoteService;
+
+@inject ISnackbar snackbar;
+@inject IJsApiService JsApiService;
+@inject IDialogService DialogService;
+
+
+@using MudExtensions;
+
+
+<div class="mb-4">
+    <MudPaper Class="pa-2">
+        @if (View?.Creator != null)
+        {
+            <div class="d-flex flex-row gap-1">
+                <MudText Typo="TitleTypo">
+                    <b>
+                        <MudHighlighter Class="HighlightStyle" HighlightedText="@Search" Text="@View.Name" />
+                    </b>
+                </MudText>
+                <MudTooltip Text="@((View.Finished) ? "Tournament has been finished" : "Tournament has NOT been finished")">
+                    <MudIconButton Style="opacity:.7;" Color="(View.Finished) ? Color.Success : Color.Error" Icon="@Icons.Material.Filled.Flag" />
+                </MudTooltip>
+                <MudTooltip Text="Get QR-Code">
+                    <MudIconButton Icon="@Icons.Material.Filled.QrCode2" OnClick="() => visible = true" />
+                </MudTooltip>
+                <MudDialog @bind-IsVisible="visible">
+                    <TitleContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Class="mr-3" /> QR-Code
+                        </MudText>
+                    </TitleContent>
+                    <DialogContent>
+                        <p>Scan code to go to detail</p>
+                        <MudExtensions.MudBarcode Color="var(--mud-palette-text-primary)" BackgroundColor="var(--mud-palette-surface)" Clickable="true" BarcodeFormat="ZXing.BarcodeFormat.QR_CODE" Width="500" Height="500" Value="@($"{navManager.BaseUri}tournament/{View.Guid}/detail")" />
+                    </DialogContent>
+                    <DialogActions>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => visible = false" Class="px-10">Close</MudButton>
+                    </DialogActions>
+                </MudDialog>
+                <MudIconButton Color="Color.Info" Icon="@Icons.Material.Filled.Share" OnClick="Share" />
+                @{bool access = false;}
+                @if (User != null && User.HasAccess)
+                {
+                    access = View.HasAdmin(User);
+                    <MudMenu Disabled="!access" Color="Color.Secondary" Icon="@Icons.Material.Filled.Settings">
+                        @if (View.Creator.Id == User.Id)
+                        {
+                            <MudMenuItem OnClick="ShowAdmins" Icon="@MudBlazor.Icons.Material.Rounded.ManageAccounts" IconColor="@Color.Secondary">
+                                <MudText Color="@Color.Secondary">Configure staff</MudText>
+                            </MudMenuItem>
+                        }
+                        <MudMenuItem Disabled="View.Finished || !access" OnClick="ShowUsers" Icon="@MudBlazor.Icons.Material.Rounded.ManageAccounts" IconColor="@Color.Tertiary">
+                            <MudText Color="@Color.Tertiary">Configure players</MudText>
+                        </MudMenuItem>
+                        <MudMenuItem Disabled="!access" Href="@($"/tournament/{View.Guid}/update")" Icon="@MudBlazor.Icons.Material.Rounded.Edit" IconColor="@Color.Warning">
+                            <MudText Color="@Color.Warning">Edit tournament</MudText>
+                        </MudMenuItem>
+                        @if (View.Creator.Id == User.Id)
+                        {
+                            <MudMenuItem Disabled="!access" OnClick="Delete" Icon="@MudBlazor.Icons.Material.Rounded.DeleteForever" IconColor="@Color.Secondary">
+                                <MudText Color="@Color.Error">Delete tournament</MudText>
+                            </MudMenuItem>
+                        }
+                    </MudMenu>
+                }
+            </div>
+            <div class="d-flex flex-row gap-2 cursor-pointer" @onclick=@(() => navManager.NavigateTo($"/profile/{View.Creator.Id}"))>
+                <Avatar Clickable="false" showName="false" Account="View.Creator"></Avatar>
+                <div class="ml-8">
+                    <MudText Typo="Typo.subtitle1">@View.Creator.DisplayName</MudText>
+                    <MudText Typo="Typo.caption">@@@View.Creator.Username</MudText>
+                </div>
+            </div>
+            <div style="opacity:.7;">
+                <div>
+                    <MudText Typo="Typo.caption">@View.Guid</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption">Created:</MudText>
+                    <MudText Typo="Typo.caption">@View.CreationDate.ToLongDateString()</MudText>
+                    <MudText Typo="Typo.caption">@View.CreationDate.ToLongTimeString()</MudText>
+                </div>
+            </div>
+            <div class="d-flex flex-row gap-2">
+                <MudIcon Icon="@(View.isPublic ? Icons.Material.Filled.Public : Icons.Material.Filled.VisibilityOff)" />
+                <MudText>@(View.isPublic ? "Public" : "Private")</MudText>
+            </div>
+            <div class="d-flex flex-row gap-2 my-2">
+                <MudIcon Icon="@(string.IsNullOrEmpty(View.Password) ? Icons.Material.Filled.LockOpen : Icons.Material.Filled.Lock)" />
+                <MudText>@(string.IsNullOrEmpty(View.Password) ? "No password" : "Password required")</MudText>
+            </div>
+            @if (View.StartingDate != null)
+            {
+                <div class="d-flex flex-row gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" />
+                    <MudText>@(((DateTime)View.StartingDate).ToLongDateString())</MudText>
+                </div>
+            }
+            <div class="d-flex flex-row gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.People" />
+                <MudText>@View.Players.Count()</MudText>
+                <MudText>/</MudText>
+                <MudText>@View.MaxPlayers</MudText>
+            </div>
+            <br />
+            @if (ExtraDetail && !Joined && (!string.IsNullOrEmpty(View.Password)))
+            {
+                <MudPasswordField Disabled="!canJoin" Variant="Variant.Filled" @bind-Value="password" Label="Password (required)" HelperText="This tournament is password protected enter the password to join it"></MudPasswordField>
+            }
+            <div class="d-flex flex-row gap-3">
+                @if (ExtraDetail)
+                {
+                    <div class="d-flex flex-column gap-2">
+
+                        @if (!canJoin)
+                        {
+                            <MudText Color="Color.Error">@Reason</MudText>   
+                        }
+                        <div class ="d-flex flex-row gap-3">
+
+                            @if (Joined)
+                            {
+      
+                                <MudButton Disabled="!canJoin" Variant="Variant.Outlined" Color="Color.Secondary" OnClick="LeaveTournament">Leave</MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Disabled="!canJoin" Variant="Variant.Filled" Color="Color.Secondary" OnClick="JoinTournament">Join</MudButton>
+                            }
+
+                            <MudButton Variant="Variant.Filled" Color="Color.Tertiary" OnClick="ViewTournament">View</MudButton>
+                            @if (View.Finished)
+                            {
+                                <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="ShowResults">View results</MudButton>
+                        
+                            }
+                            @if (User != null && User.HasAccess)
+                            {
+                                if (View.HasAdmin(User))
+                                {
+                                    <MudButton Variant="Variant.Filled" Color="Color.Warning" Href="@($"/tournament/{View.Guid}/control")">Control</MudButton>
+                                }
+                                else
+                                {
+                                    <MudTooltip Text="You dont have access to modify this tournament">
+                                        <MudButton Disabled="true" Variant="Variant.Filled" Color="Color.Warning">Control</MudButton>
+                                    </MudTooltip>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                }
+                else if (View?.Guid != null)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Info" Href="@($"/tournament/{View.Guid}/detail")">Details</MudButton>
+                }
+            </div>
+        }
+    </MudPaper>
+    @if (ExtraDetail)
+    {
+        if (View?.Description != null)
+        {
+            <MudPaper>
+                <MudExpansionPanel IsInitiallyExpanded="true" Class="mt-2">
+                    <TitleContent>
+                        <MudText>Description</MudText>
+                    </TitleContent>
+                    <ChildContent>
+                        @((MarkupString)View!.Description!)
+                    </ChildContent>
+                </MudExpansionPanel>
+            </MudPaper>
+        }
+        <MudPaper>
+            <MudExpansionPanel Disabled="(View.Players.Count() == 0)" Class="mt-2">
+                <TitleContent>
+                    <div class="d-flex flex-row gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.People" />
+                        <MudText>Players Joined</MudText>
+                        <MudText>:</MudText>
+                        <MudText>@View.Players.Count()</MudText>
+                    </div>
+                </TitleContent>
+                <ChildContent>
+                    @foreach (var player in View.Players)
+                    {
+                        <div class="d-flex flex-row gap-2 my-1">
+                            <Avatar showName="false" Account="player"></Avatar>
+                            <div class="ml-8">
+                                <MudText Typo="Typo.subtitle1">@player.DisplayName</MudText>
+                                <MudText Typo="Typo.caption">@@@player.Username</MudText>
+                            </div>
+                        </div>
+                    }
+                </ChildContent>
+            </MudExpansionPanel>    
+        </MudPaper>
+    }
+</div>
+
+
+@code {
+    [Parameter]
+    public Tournament? View { get; set; }
+
+    [Parameter]
+    public bool ExtraDetail { get; set; } = false;
+
+    [CascadingParameter(Name = "Search")]
+    public string? Search { get; set; } = null;
+
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount User { get; set; }
+
+    [CascadingParameter(Name = "IsMobile")]
+    public bool IsMobile { get; set; }
+
+    private Typo TitleTypo => IsMobile ? Typo.h6 : Typo.h4;
+
+    private string password = string.Empty;
+    private bool canJoin, visible, Joined;
+
+    private string Reason= "You need to be logged in to be able to join a tournament";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (User != null && View != null)
+        {
+            var couple = await dtoService.GetTournamentPlayerCouple(View, User);
+            Joined = (couple != null);
+
+            if (!Joined)
+            {
+                Reason = "You are unqualified to join becasue it is full!";
+                canJoin = View.Players.Count() < View.MaxPlayers;
+            }
+            else
+                canJoin = true;
+
+            if (canJoin)
+            {
+                canJoin = View.EmailAllowed(User);
+                Reason = "You are unqualified to join because your email domain!";
+            }
+
+            if (canJoin)
+            {
+                Reason = "You are unqualified to join because your not verified!";
+                canJoin = User.Verified;
+            }
+
+            if (View.Finished){
+                 Reason = "You are unqualified to join because the tournament is finished!";
+                canJoin = false;
+            }
+
+            StateHasChanged();
+            remoteService.CallRequestRefresh();
+        }
+    }
+
+    private async void ShowResults()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("First", View.First);
+        parameters.Add("Second", View.Second);
+        parameters.Add("Third", View.Third);
+        DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = false };
+        // Shows winner dialog
+        var dialog = DialogService.Show<WinnerDialog>("Tournament has been finished", parameters, closeOnEscapeKey);
+    }
+
+    private async void Delete()
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Deleting can not be undone!",
+            yesText: "Delete tournament!", cancelText: "Cancel");
+
+        if (result != null && result == true)
+        {
+            bool? result2 = await DialogService.ShowMessageBox(
+                "Second Warning",
+                "Are you absolutely sure that you want to DELETE this tournament all of its data will be gone FOREVER!",
+                yesText: "Delete tournament!", cancelText: "Cancel");
+            if (result2 != null && result2 == true)
+            {
+                //deletes the tournament
+                await dtoService.DeleteTournament(View.Id,View);
+                snackbar.Add("Tournament has been deleted.",Severity.Warning);
+                navManager.NavigateTo("/tournament",true);
+            }
+        }
+    }
+
+    public async void ShowUsers()
+    {
+        if (View.Players == null)
+            snackbar.Add("No player", Severity.Error);
+
+        var parameters = new DialogParameters();
+
+        parameters.Add("CurrentTournament", View);
+
+        DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = true, DisableBackdropClick = true };
+        // Shows tournament user view dialog 
+        var dialog = await DialogService.ShowAsync<TournamentUsersViewDialog>("View users", parameters, closeOnEscapeKey);
+
+        StateHasChanged();
+    }
+
+    public async void ShowAdmins()
+    {
+        if (View.Admins == null)
+            snackbar.Add("No Staff", Severity.Error);
+
+        var parameters = new DialogParameters();
+
+        parameters.Add("CurrentTournament", View);
+
+        DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = true, DisableBackdropClick = true };
+        // Shows tournament admin view dialog
+        var dialog = await DialogService.ShowAsync<TournamentAdminsViewDialog>("View Staff", parameters, closeOnEscapeKey);
+
+        StateHasChanged();
+    }
+
+    private async Task Share()
+    {
+        string url = $"{navManager.BaseUri}tournament/{View.Guid}/detail";
+        await JsApiService.CopyToClipboardAsync(url);
+        snackbar.Add("Url copied", Severity.Success);
+    }
+
+    public async Task ViewTournament(MouseEventArgs e)
+    {
+        if (e.ShiftKey)
+            navManager.NavigateTo($"/tournament/{View.Guid}/fullscreen");
+        else
+            navManager.NavigateTo($"/tournament/{View.Guid}/view");
+    }
+    public async Task LeaveTournament()
+    {
+        if (User != null && View != null && Joined)
+        {
+            // Delete the link between tournament and the player
+            await dtoService.DeleteTournamentPlayerCouple(View, User);
+            navManager.NavigateTo(navManager.Uri,true);
+        }
+    }
+    public async Task JoinTournament()
+    {
+        if (User != null && View != null && !Joined)
+        {
+            if (!string.IsNullOrEmpty(View.Password))
+            {
+                if (password != View.Password)
+                {
+                    snackbar.Add("Password isnt correct!");
+                    return;
+                }
+            }
+            // Creates the link between tournament and the player
+            await dtoService.CreateTournamentPlayerCouple(View, User);
+            navManager.NavigateTo(navManager.Uri, true);
+        }
+    }
+
+    private void Reload() => navManager.NavigateTo(navManager.Uri, true);// Reload the current page
+}

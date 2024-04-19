@@ -1,0 +1,22 @@
+﻿<MudDialog>
+    <DialogContent>
+        <MudText>Image</MudText>
+        <MudImage Src="@Source" Width="500" Height="375" />
+    </DialogContent>
+    <DialogActions>
+        <MudLink Target="_blank" Href="@Source">Open source</MudLink>
+        <MudButton OnClick="Cancel">Close</MudButton>
+        <MudFocusTrap />
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance? MudDialog { get; set; }
+
+
+    [Parameter]
+    public string Source { get; set; }
+
+    void Cancel() => MudDialog?.Cancel();
+}

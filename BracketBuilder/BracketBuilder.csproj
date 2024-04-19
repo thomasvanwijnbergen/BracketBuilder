@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+	  <TargetFramework>net6.0</TargetFramework>
+	  <Nullable>enable</Nullable>
+	  <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Components\TournamentStyle.css" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="blazor-dom-confetti" Version="0.0.0.5" />
+    <PackageReference Include="BlazorPro.BlazorSize" Version="6.2.2" />
+    <PackageReference Include="CodeBeam.MudBlazor.Extensions" Version="6.6.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.12" />
+    <PackageReference Include="MudBlazor" Version="6.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Database\data\" />
+    <Folder Include="wwwroot\documents\" />
+  </ItemGroup>
+
+</Project>

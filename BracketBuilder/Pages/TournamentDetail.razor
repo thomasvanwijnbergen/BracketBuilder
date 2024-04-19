@@ -1,0 +1,8 @@
+﻿@page "/tournament/{GuidStr}/detail";
+
+@inherits _LayoutTournamentUrl;
+
+@if (CurrentTournament != null)
+{
+    <TourDetails View="CurrentTournament" ExtraDetail="true" />
+}

@@ -1,0 +1,391 @@
+﻿@inject NavigationManager navManager;
+@inject ISnackbar snackbar;
+@inject DatabaseDTOService dtoService;
+@inject RemoteService remoteService;
+@inject CommunicationService commService;
+@inject IDialogService dialogService;
+
+@using MudExtensions;
+@using MudExtensions.Enums;
+
+<div>
+    <MudMenu Disabled="!Clickable" ActivationEvent="MouseEvent.RightClick">
+        <ActivatorContent>
+            <MudTooltip Arrow="true" Placement="Placement.Left" ShowOnFocus="TipVisible" ShowOnHover="TipVisible" Text="@Tip">
+            <div class="d-flex flex-row gap-2 align-center">
+
+                <MudBadge Overlap="true"
+                          Bordered="true"
+                          Content="badgeContent"
+                          Color="badgeColor"
+                          Visible="hasBadge">
+                    <MudAvatar Variant="@matchVariant" Size="(small == null) ? Size.Large : ((bool)small ? Size.Small : (showName ? Size.Small : Size.Medium))" Class="cursor-pointer" @onclick="Click" Color="@userColor">
+                        @if (Account == null || string.IsNullOrEmpty(Account.ProfilePicture))
+                        {
+                            @userLetter
+                        }
+                        else
+                        {
+                            <MudImage @onclick="async () => {if (!Clickable) {await ShowImage(Account.ProfilePicture);}}" Src="@Account.ProfilePicture" />
+                        }
+                    </MudAvatar>
+                </MudBadge>
+                @if (showName)
+                {
+                    if (Player != null && Player?.Position > Match?.Position)
+                    {
+                        <MudTextM3 Typo="TypoM3.Body" Style="@($"color:{winnerColor} !important;")" Size="Size.Medium"><b>@Name</b></MudTextM3>
+                    }
+                    else
+                    {
+                        <MudTextM3 Typo="TypoM3.Body" Style="@($"color:{winnerColor} !important;")" Size="Size.Medium">@Name</MudTextM3>
+                    }
+                }
+            </div>
+            </MudTooltip>
+        </ActivatorContent>
+        <ChildContent>
+            @if (Account == null)
+            {
+                @if (showName && Control)
+                { 
+                    <MudMenuItem OnClick="PullPoints">
+                        Pull player with most points
+                    </MudMenuItem>
+                }
+            }
+            else
+            {
+                <MudMenuItem>
+                    <MudLink Color="Color.Default" Href=@($"/profile/{Account.Id}")>Go to profile</MudLink> 
+                </MudMenuItem>
+                @if (!string.IsNullOrWhiteSpace(Account.ProfilePicture))
+                {
+                    <MudMenuItem OnClick="() => ShowImage(Account.ProfilePicture)">
+                        <MudLink Color="Color.Default">View profile picture</MudLink> 
+                    </MudMenuItem>
+                }
+                @if (showName && Control)
+                {
+                    <MudMenuItem OnClick="RewardPoints">
+                        Reward points
+                    </MudMenuItem>
+                    @if (Match?.Children.Count() > 0)
+                    {
+                        <MudMenuItem OnClick="SendBack">
+                            Send back
+                        </MudMenuItem>
+                    }
+                }
+            }
+        </ChildContent>
+    </MudMenu>
+</div>
+
+@code {
+    [CascadingParameter(Name = "HasControl")]
+    public bool Control { get; set; }
+
+    [CascadingParameter(Name = "DarkMode")]
+    public bool DarkMode { get; set; }
+
+    [CascadingParameter(Name = "HideBadge")]
+    public bool HideBadge { get; set; } = false;
+
+    string winnerColor
+    {
+        get
+        {
+            //green color to indicate that has won before
+            if (Player != null && Player?.Position > Match?.Position)
+            {
+                //green color
+                if (DarkMode)
+                    return "rgba(11,186,131,1)";
+                else
+                    return "rgba(0,200,83,1)";
+            }
+            //gold color for selected winner, only visible to admin
+            else if (Player != null && Player?.Position == Match?.Position && Player.Winner && Control)
+            {
+                //yellow/golden color
+                if (DarkMode)
+                    return "rgba(255,168,0,1)";
+                else
+                    return "rgba(255,152,0,1)";
+            }
+            return "var(--mud-palette-text-primary)";
+        }
+    }
+    string winnerClass
+    {
+        get
+        {
+            if (Player == null)
+                return "";
+            if (Player?.Position > Match?.Position)
+                return "winner";
+            return "";
+        }
+    }
+
+    [Parameter]
+    public bool showName { get; set; } = true;
+
+    [Parameter]
+    public bool? small { get; set; } = false;
+
+    [Parameter]
+    public UserAccount? Account { get; set; }
+
+    [Parameter]
+    public Player? Player { get; set; }
+
+    [Parameter]
+    public Match? Match { get; set; }
+
+    [Parameter]
+    public bool Clickable { get; set; } = true;
+
+    //public EventCallback<MouseEventArgs> OnClick { get; set; }
+    [Parameter]
+    public Action<MouseEventArgs, Match?, int>? OnClick { get; set; } = null;
+
+    string Name => (Account == null) ? "Empty" : Account.Username;
+    bool TipVisible => !((Account == null) || (Player == null));
+
+    string Tip => ((Account == null) || (Player == null)) ? string.Empty : $"Score: {Player.Score}\n Seeding: {Tournament.CalculateSeedingScore(Player.Account)}";
+
+    private List<Match> Matches = new List<Match>();
+
+    private async Task RewardPoints(MouseEventArgs e)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Player", Player);
+        parameters.Add("Account", Player.Account);
+        parameters.Add("Score", Player.Score);
+        parameters.Add("Type", nameof(Models.Player.Score));
+        DialogOptions closeOnEscapeKey = new DialogOptions() { CloseOnEscapeKey = true };
+        var dialog = dialogService.Show<PointsDialog>("Update Points", parameters, closeOnEscapeKey);
+    }
+
+    private async Task PullPoints(MouseEventArgs e)
+    {
+        if (Match != null && Control)
+        {
+            Player MostPoints = null;
+            Match PointMatch = null;
+            //loop trouh all direct child competitors
+
+            List<(Player, Player)> PointClash = new List<(Player, Player)>();
+
+            //for each child match
+            foreach (var child in Match.Children)
+            {
+                //for each competitor
+                foreach (var competitor in child.Competitors)
+                {
+                    //if they have more points than what we have
+                    if (MostPoints == null || competitor.Score > MostPoints.Score)
+                    {
+                        //if the player hasnt already passed
+                        if (!Match.Competitors.Contains(competitor))
+                        {
+                            //this player, in this match has the most points
+                            MostPoints = competitor;
+                            PointMatch = child;
+                        }
+                    }
+                    else if (MostPoints != null && competitor.Score == MostPoints.Score)
+                    {
+                        PointClash.Add((MostPoints,competitor));
+                    }
+                }
+            }
+            if (MostPoints == null)
+            {
+                snackbar.Add("No childeren were found", Severity.Warning);
+                return;
+            }
+
+            int clashCount = 0;
+            List<Player> Clashed = new List<Player>();
+
+            foreach (var (most, competitor) in PointClash)
+            {
+                if (MostPoints.Score == most.Score || MostPoints.Score == competitor.Score)
+                {
+                    clashCount++;
+                    Clashed.Add(competitor);
+                }
+            }
+            if (clashCount > 0)
+            {
+                string usernames = string.Join(", ",Clashed.Select(c => c.Account.DisplayName));
+                snackbar.Add($"player: \"{MostPoints.Account.DisplayName}\" Has the same amount of points as {clashCount} others! ({usernames}) \n({clashCount+1} players have {MostPoints.Score} points)", Severity.Warning, (opt) => { opt.RequireInteraction = true; opt.ShowCloseIcon = true; });
+            }
+            //we invoke an onclick giving this the player with the most points and its match, so itll send it to the next round
+            OnClick?.Invoke(e, PointMatch, MostPoints.Account.Id);
+
+        }
+    }
+
+    public async Task ShowImage(string url)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Source", url);
+        var dialog = dialogService.Show<PictureViewDialog>("Picture", parameters);
+
+        var result = await dialog.Result;
+    }
+
+    private async Task SendBack(MouseEventArgs e)
+    {
+        if (Match != null && Account != null && Control)
+        {
+            bool found = false;
+            foreach (var child in Match.Children)
+            {
+                if (child.Competitors.Exists(p => p.Account.Id == Account.Id))
+                {
+                    found = true;
+                    OnClick?.Invoke(e, child, Account.Id);
+                    break;
+                }
+            }
+            if (!found)
+            {
+                snackbar.Add("No childeren were found", Severity.Warning);
+            }
+        }
+    }
+
+    private async Task Click(MouseEventArgs e)
+    {
+        if (OnClick != null && Account != null && Control)
+        {
+            if (e.CtrlKey)
+            {
+                await RewardPoints(e);
+            }
+            else
+            {
+                OnClick?.Invoke(e, Match, Account.Id);
+            }
+        }
+    }
+
+    public Color userColor => UsernameToColor(Account?.Username);
+    public string userLetter => UserToLetter(Account);
+    public Variant matchVariant => MatchToVariant(Match);
+
+    public Color badgeColor = Color.Default; 
+    public string badgeContent = "null";
+    public bool hasBadge = false;
+
+
+    Variant MatchToVariant(Match? match)
+    {
+        if (match == null)
+            return Variant.Filled;
+        if (match.isActive)
+            return Variant.Filled;
+        else
+            return Variant.Outlined;
+
+    }
+
+    string UserToLetter(UserAccount? user)
+    {
+        if (user == null)
+            return "?";
+        string letter = user.Username.Substring(0, 1);
+        if (user.Role == UserAccount.User)
+        {
+            return letter.ToLower();
+        }
+        else
+        {
+            return letter.ToUpper();
+        }
+    }
+
+    /// <summary>
+    /// Get any of the mudblazor color's for this username
+    /// </summary>
+    /// <param name="username"></param>
+    /// <returns></returns>
+    Color UsernameToColor(string? username)
+    {
+        if (username == null)
+            return Color.Default; //gray
+
+        //get the weight of the username (should be somewhat random, but similair usernames shouldnt have the same)
+        int nameWheight = username.Sum(c => (int)c);
+
+        //restrict its range so it can only ever be 1,2,3,4,5,6 or 7 then cast that to a Color
+        nameWheight %= 7;
+        nameWheight += 1;
+
+        return (Color)nameWheight;
+    }
+    public static string UsernameToTheme(string? username)
+    {
+        if (username == null)
+            return "mud-default-gray".ToLower(); //gray
+
+        //get the weight of the username (should be somewhat random, but similair usernames shouldnt have the same)
+        int nameWheight = username.Sum(c => (int)c);
+
+        //restrict its range so it can only ever be 1,2,3,4,5,6 or 7 then cast that to a Color
+        nameWheight %= 7;
+        nameWheight += 1;
+
+        return "mud-theme-" + ((Color)nameWheight).ToString().ToLower();
+    }
+
+    protected override void OnInitialized()
+    {
+        if (HideBadge)
+        {
+            hasBadge = false;
+            return;
+        }
+
+        if (Account == null)
+            return;
+
+        switch (Account.Role)
+        {
+            case UserAccount.User:
+                hasBadge = false;
+                break;
+            case UserAccount.Admin:
+                hasBadge = true;
+                badgeColor = Color.Error;
+                badgeContent = "Admin";
+                break;
+            case UserAccount.Moderator:
+                hasBadge = true;
+                badgeColor = Color.Tertiary;
+                badgeContent = "Mod";
+                break;
+            default:
+                hasBadge = true;
+                badgeColor = Color.Primary;
+                badgeContent = Account.Role;
+                break;
+        }
+
+        //if (showName == true && Player != null && Account.Role == "User")
+        //{
+        //    hasBadge = true;
+        //    badgeColor = Color.Default;
+        //    badgeContent = Player.Score.ToString();
+            
+        //}
+    }
+
+
+
+}

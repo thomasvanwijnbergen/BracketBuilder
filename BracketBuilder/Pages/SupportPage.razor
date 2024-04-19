@@ -1,0 +1,168 @@
+﻿@page "/support";
+@page "/support/admin";
+@page "/support/new";
+
+@inject NavigationManager navManager;
+<MudExpansionPanels>
+    @if (User == null)
+    {
+        <MudExpansionPanel Text="New" Class="mx-auto my-3 pa-6" Style="width:75%">
+            <MudExpansionPanels>
+                <MudExpansionPanel Class="mx-auto" Text="How to create an account?" MaxHeight="150">
+                <MudText Style="width:auto%">
+                    To create an account, go to<MudButton Style="padding:0" OnClick="ToLogin">Login</MudButton>.
+                    Then, click on "Register instead". Enter your username, email, and password. 
+                    Afterwards, click on the 'Register' button. 
+                    Your account will be created, and you can log in with your credentials.
+                </MudText>
+            </MudExpansionPanel>
+                <MudExpansionPanel Text="How to Log in to your account?" MaxHeight="500">
+                <MudText Style="width:auto%">
+                    To log in to your account, go to<MudButton Style="padding:0" OnClick="ToLogin">Login</MudButton>.
+                    Enter your credentials and click on the 'Login' button.
+                </MudText>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    </MudExpansionPanel>
+    }
+    @if (User != null && User.Role == "User")
+    {
+        <MudExpansionPanel Text="User" Class="mx-auto my-2 pa-6" Style="width:75% ">
+            <MudExpansionPanels>
+                <MudExpansionPanel Text="How to Join a tournament?" MaxHeight="150">
+                    <MudText>
+                        To join a tournament, go to <MudButton Style="padding:0" OnClick="@(e => NavigateTo("tourament"))">Tournament</MudButton>.
+                        Here, click on the button 'Details'. Afterwards click on 'Join'.
+                        When joined click on 'Leave' to leave the tournament.
+                    </MudText>
+                </MudExpansionPanel>
+                <MudExpansionPanel Text="How to view a tournament?" MaxHeight="500">
+                    <MudText>
+                        To view a tournament, navigate to <MudButton Style="padding:0" OnClick="@(e => NavigateTo("tourament"))">Tournament</MudButton>.
+                        Click on the 'View' button, and the tournament details will appear. 
+                        On this page, you have two options. The first option is 'Go back,' which returns you to the tournament details. 
+                        The second option is 'Fullscreen,' which focuses on the view.
+                    </MudText>
+                    <MudText>
+                        While in fullscreen mode, additional options become available, 
+                        including QR Code to share the view page with others, Refresh to update the tournament, 
+                        Return to Details to go back to tournament details, Home to return to the homepage, and Eye to revert to the normal view.
+                        'Login' button if not logged in, or 'logout' button if already logged in."
+                    </MudText>
+                </MudExpansionPanel>
+                <MudExpansionPanel Text="How to change Account details?" MaxHeight="1000">
+                    <MudText Style="width:auto%">
+                        To update your account information, navigate to <MudButton Style="padding:0" OnClick="@(e => NavigateTo("settings"))">Account settings</MudButton>.
+                        Here, you can modify all your personal details.
+                        Click on the (✎) icon to initiate changes.
+                        Once updated, click on the (✓) symbol to save or (X) to cancel.
+                    </MudText>
+                </MudExpansionPanel>
+                <MudExpansionPanel Text="how to see your profile information?">
+                    <MudText>
+                        To view your profile information, visit <MudButton Style="padding:0" OnClick="@(e => NavigateTo("profile"))">Profile</MudButton>.
+                        On this page, you will find a life count of your account, total wins, total games played, highest score, and total score.
+                    </MudText> 
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudExpansionPanel>
+    }
+    @if (isAdmin)
+    {
+        <MudExpansionPanel Text="Admin" Class="mx-auto my-2 pa-6" Style="width:75% ">
+            <MudExpansionPanels>
+                <MudExpansionPanel  Text="How to import users?" MaxHeight="150">
+                    <MudText>
+                        To import users, navigate to <MudButton Style="padding:0" OnClick="@(e => NavigateTo("import"))">Import</MudButton>.
+                        Here, you can choose 'Users overview' to see a list of all users and delete them if needed. 
+                        Alternatively, select 'Upload CSV' to open your files and upload a CSV file with usernames. 
+                        After selecting a file, there are options to edit the file, change the 'split by' parameter, and add the users. 
+                        Another option is to manually type the users in the 'Edit' section and add them that way.
+                    </MudText>
+                </MudExpansionPanel>
+                <MudExpansionPanel Text="How to create a tournament?" MaxHeight="500">
+                    <MudText>
+                        To create a tournament, go to <MudButton Style="padding:0" OnClick="@(e => NavigateTo("create"))">Create</MudButton>. 
+                        On this page, you can adjust settings such as 'Max players,' 'Public' or 'Private,' 'Password,' and 'Name' to customize the tournament as desired. 
+                        Once all the information is filled, click on 'Create,' and a new tournament will be generated.
+                    </MudText>
+                </MudExpansionPanel>
+                <MudExpansionPanel Text="How to start a tournament?" MaxHeight="1000">
+                    <MudText>
+                        To start a tournament, go to <MudButton Style="padding:0" OnClick="@(e => NavigateTo("tournament"))">Tournament</MudButton>. 
+                        Click on the 'Details' button, then select 'Control'.
+                    </MudText>
+                    <MudText>
+                        In the 'Control' section, you have three options. 
+                        The first option allows you to go back to the tournaments page. 
+                        The second option is 'Configure,' which opens a dialog where you can adjust settings such as 
+                        'Automatic' or 'Manual,' Quarter Finals Match Count, and 'Configure players' to select which players participate in the tournament. 
+                        Choosing 'Automatic' will generate the tournament automatically, while selecting 'Manual' allows you to adjust the number of starting matches.
+                    </MudText>
+                    <MudText>
+                        Clicking on 'Generate bracket' initiates the tournament, if that's not the intention, click on 'Cancel.
+                        The last option is 'View', clicking on it will redirect you to the tournament view..
+                    </MudText>
+                </MudExpansionPanel>
+                <MudExpansionPanel Text="How to delete a tournament?">
+                    <MudText>
+                        To delete a tournament, visit <MudButton Style="padding:0" OnClick="@(e => NavigateTo("tournament"))">Tournament</MudButton>. 
+                        Click on the 'Details' button, and then choose 'Delete tournament.'
+                    </MudText>
+                    <MudText>
+                        This will prompt a warning dialog. 
+                        If the intention is to delete the tournament, click on 'Delete tournament' otherwise, click 'Cancel.
+                    </MudText>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudExpansionPanel>
+    }
+</MudExpansionPanels>
+
+@code
+{
+    bool isAdmin => User != null && User.Role == UserAccount.Admin;
+    bool isAdminUrl => IsAdminUrl();
+    bool isNewUrl => IsNewUrl();
+
+
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount? User { get; set; }
+
+    [CascadingParameter(Name = "AuthSession")]
+    public bool isLoggedin { get; set; }
+
+
+    private bool IsAdminUrl()
+    {
+        string currentUrl = navManager.Uri;
+        return currentUrl.Contains("/help/admin", StringComparison.OrdinalIgnoreCase);
+    }
+    private bool IsNewUrl()
+    {
+        string currentUrl = navManager.Uri;
+        return currentUrl.Contains("/help/new", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void NavigateTo(string to)
+    {
+        var uri = navManager.ToBaseRelativePath(navManager.Uri);
+        if (!uri.ToLower().StartsWith($"{to}"))
+        {
+            navManager.NavigateTo($"/{to}", true);
+        }
+    }
+
+    private void ToLogin()
+    {
+        var uri = navManager.ToBaseRelativePath(navManager.Uri);
+        if (!uri.ToLower().StartsWith("login"))
+        {
+            if (uri == "help" || uri == "support")
+                navManager.NavigateTo($"/login/{Base64Encode(uri + "/new")}", true);
+            else
+                navManager.NavigateTo($"/login/{Base64Encode(uri)}", true);
+        }
+    }
+    public string Base64Encode(string plainText) => NavigationMenu.Base64Encode(plainText);
+}

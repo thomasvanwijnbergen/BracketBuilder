@@ -1,0 +1,37 @@
+﻿@page "/";
+@inject NavigationManager navManager;
+@*@inject IHttpContextAccessor httpContextAccessor;*@
+@inject ISnackbar snackBar;
+
+
+
+<PageTitle>Home</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <MudText Typo="Typo.h3" GutterBottom="true">Hello, @context.User.Identity.Name!</MudText>
+    </Authorized>
+    <NotAuthorized>
+        <MudText Typo="Typo.h3" GutterBottom="true">Hello, Guest</MudText>
+    </NotAuthorized>
+</AuthorizeView>
+
+<MudText Class="mb-8">Welcome to Bracket Builder, The tool for creating and sharing tournaments!</MudText>
+<MudText Class="mb-8">Would you like a quick guide?</MudText>
+<AuthorizeView Roles="@UserAccount.Admin">
+    <Authorized>
+        <MudButton Variant="Variant.Outlined" Color="Color.Info" Href="/support">Yes please give me a guide for admins</MudButton>
+    </Authorized>
+    <NotAuthorized>
+        <MudButton Variant="Variant.Outlined" Color="Color.Info" Href="/support">Yes please give me a guide</MudButton>
+    </NotAuthorized>
+</AuthorizeView>
+<br/>
+<MudButton Class="mt-3" Variant="Variant.Outlined" Color="Color.Tertiary" Href="/tournament">No just take me to the tournaments</MudButton>
+@*<MudAlert Severity="Severity.Error">To debug the database go to /debug: <MudLink Href="/debug" Typo="Typo.body2" Color="Color.Inherit"><b>Debug now</b></MudLink></MudAlert>*@
+@*<MudAlert Severity="Severity.Error">To debug the accounts go to /debug/accounts: <MudLink Href="/debug/accounts" Typo="Typo.body2" Color="Color.Inherit"><b>Debug accounts</b></MudLink></MudAlert>*@
+
+@code{
+
+
+}

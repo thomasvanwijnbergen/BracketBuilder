@@ -1,0 +1,56 @@
+﻿<MudNavMenu Bordered="true" Rounded="true" Color="Color.Primary">
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Rounded.Home"><p class="menu-wrapper">Home</p></MudNavLink>
+    @if (User != null)
+    {
+        <MudNavLink Href="settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.Settings"><p class="menu-wrapper">Settings</p></MudNavLink>
+        <MudNavLink Href="profile" ForceLoad="true" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.AccountCircle"><p class="menu-wrapper">Account</p></MudNavLink>
+        @if (User.HasAccess)
+        {
+            <MudNavLink Href="import" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.ImportContacts"><p class="menu-wrapper">Import</p></MudNavLink>
+            <MudNavLink Href="create" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.AddCircle"><p class="menu-wrapper">Create Tournament</p></MudNavLink>
+        }
+    }
+    <MudNavLink Href="tournament" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.Tour"><p class="menu-wrapper">Tournament</p></MudNavLink>
+    <MudNavLink Href="users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.Group"><p class="menu-wrapper">Users</p></MudNavLink>
+    <MudNavLink Class="d-flex align-self-end" Href="support" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.QuestionMark" IconColor="Color.Info"><p class="menu-wrapper">Support</p></MudNavLink>
+</MudNavMenu>
+
+@code {
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount User { get; set; }
+
+    public static void Login(NavigationManager navManager)
+    {
+        var uri = navManager.ToBaseRelativePath(navManager.Uri);
+        if (uri.ToLower().StartsWith("login")) { }
+        else if (uri.ToLower().StartsWith("verify") || uri.ToLower().StartsWith("forgot"))
+        {
+            navManager.NavigateTo($"/login", true);
+        }
+        else
+        {
+            navManager.NavigateTo($"/login/{Base64Encode(uri)}", true);
+        }
+    }
+
+    public static void Logout(NavigationManager navManager)
+    {
+        var uri = navManager.ToBaseRelativePath(navManager.Uri);
+        if (uri == "/")
+            navManager.NavigateTo("/logout");
+        else
+            navManager.NavigateTo($"/logout/{Base64Encode(uri)}");
+    }
+
+
+    public static string Base64Encode(string plainText)
+    {
+        var plainTextBytes = System.Text.Encoding.UTF8.GetBytes(plainText);
+        return System.Convert.ToBase64String(plainTextBytes);
+    }
+    public static string Base64Decode(string base64EncodedData) 
+    {
+        var base64EncodedBytes = System.Convert.FromBase64String(base64EncodedData);
+        return System.Text.Encoding.UTF8.GetString(base64EncodedBytes);
+    }
+}

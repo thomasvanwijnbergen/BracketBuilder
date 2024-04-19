@@ -1,0 +1,124 @@
+﻿@inject IDatabaseService databaseService;
+@inject ISnackbar snackBar;
+<MudDialog>
+    <DialogContent>
+            <AccountTable @ref="Table" Accounts="Accounts" Title="All Accounts" />
+@*        <MudTable
+            T="UserAccount" 
+            Items="Accounts"
+            Virtualize="true"
+            Dense="true" 
+            Filter="new Func<UserAccount,bool>(FilterFunc)" 
+
+            MultiSelection="true"
+            SelectOnRowClick="false"
+            @bind-SelectedItems="selectedAccounts"
+            SelectedItem="null"
+            
+        >
+            <ToolBarContent>
+                <MudSpacer />
+                    <MudTextField @bind-Value="searchString" OnKeyUp="UpdateSearch" Immediate="true" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>Id</MudTh>
+                <MudTh>Display name</MudTh>
+                <MudTh>Username</MudTh>
+                <MudTh>Link</MudTh>
+                <MudTh>Email</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Id">@context.Id</MudTd>
+                <MudTd DataLabel="Display name">@context.DisplayName</MudTd>
+                <MudTd DataLabel="Username">@context.Username</MudTd>
+                <MudTd DataLabel="Link"><MudLink Target="_blank" Href="@($"/profile/{context.Id}")">Visit</MudLink></MudTd>
+                <MudTd DataLabel="Email">@context.Email</MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>*@
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DeleteSelected">Delete all selected</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Cancel">Close</MudButton>
+        <MudFocusTrap />
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance? MudDialog { get; set; }
+
+    private AccountTable? Table { get; set; }
+    [Parameter]
+    public List<UserAccount> Accounts { get; set; }
+
+    [Parameter]
+    public Tournament? CurrentTournament { get; set; }
+
+    private string searchString;
+
+    async public void UpdateSearch()
+    {
+        // Create a copy of the current selectedTickets
+        HashSet<UserAccount> selectedAccountsCopy = new HashSet<UserAccount>(Table?.selectedAccounts);
+
+        await Task.Delay(100);
+
+        // Merge the copy and the current selectedTickets, removing duplicates
+        Table?.selectedAccounts.UnionWith(selectedAccountsCopy);
+        UpdateSelection(Table?.selectedAccounts);
+    }
+    async public void UpdateSelection(HashSet<UserAccount> selectedRows)
+    {
+        Table.selectedAccounts = selectedRows;
+        StateHasChanged();
+        // Save selected items to session storage
+        //await sessionStorage.SetItemAsync("SelectedTickets", selectedTickets);
+    }
+
+    private async void DeleteSelected()
+    {
+        if(Table?.selectedAccounts == null || Table?.selectedAccounts.Count() == 0)
+        {
+            snackBar.Add("No Account selected",Severity.Warning);
+            return;
+        }
+        int count = 0;
+        foreach (var user in Table?.selectedAccounts)
+        {
+            await databaseService.DeleteUser(user.Id);
+            count++;
+        }
+        if (count == 0)
+            snackBar.Add($"no users have been deleted");
+        else if (count == 1)
+            snackBar.Add($"1 user was deleted");
+        else
+            snackBar.Add($"{count} users have been deleted");
+
+        Accounts = await databaseService.GetUsersByFilter(role:UserAccount.User, verified:false);
+        searchString = string.Empty;
+
+        if (Accounts.Count() == 0) Cancel();
+
+        StateHasChanged();
+    }
+
+    void Cancel() => MudDialog?.Cancel();
+
+
+    private bool FilterFunc(UserAccount user)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (user.Username.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (user.DisplayName.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (user.Identificaton != null && user.Identificaton.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+}

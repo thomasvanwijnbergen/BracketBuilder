@@ -1,0 +1,38 @@
+﻿@page "/tournament/{GuidStr}/update";
+
+
+@inherits _LayoutTournamentUrl;
+
+@inject RemoteService remoteService;
+
+
+
+@if (CurrentTournament != null)
+{
+    <AuthorizeView Roles="@UserAccount.Access">
+        <Authorized>
+            @if (CurrentTournament.HasAdmin(User))
+            {
+                <h3>TournamentUpdate</h3>
+                <TournamentEditor CreateNew="false" User="User" CurrentTournament="CurrentTournament" />
+            }
+            else
+            {
+                <Auth />
+            }
+        </Authorized>
+        <NotAuthorized>
+            <Auth />
+        </NotAuthorized>
+    </AuthorizeView>
+}
+else
+{
+    <Auth />
+}
+
+
+@code {
+    [CascadingParameter(Name = "AuthUser")]
+    public UserAccount? User { get; set; }
+}

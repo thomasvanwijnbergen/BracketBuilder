@@ -1,0 +1,26 @@
+﻿@inherits LayoutComponentBase;
+@inject NavigationManager navManager;
+@inject DatabaseDTOService dtoService;
+
+
+@code {
+    [Parameter]
+    public string? GuidStr { get; set; } = null;
+
+    public Guid? Guid => ParsingExtention.GuidTryParse(GuidStr);
+
+
+    public Tournament? CurrentTournament { get; set; } = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Guid == null)
+            navManager.NavigateTo("/tournament", true);
+
+        var tournament = (await dtoService.GetTournamentsByFilter(guid: Guid)).FirstOrDefault();
+        if (tournament != null)
+        {
+            CurrentTournament = tournament;
+        }
+    }
+}

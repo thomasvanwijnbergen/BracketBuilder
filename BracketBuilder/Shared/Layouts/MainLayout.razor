@@ -1,0 +1,131 @@
+﻿@using BracketBuilder.Services.Interfaces;
+@inherits LayoutComponentBase;
+@inject NavigationManager navManager;
+@inject IUserPreferencesService UserPreferences;
+
+<MudThemeProvider Theme="CustomTheme" @ref="@_mudThemeProvider" @bind-IsDarkMode="@useDarkMode" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<style>
+    .menu-wrapper {
+        display: inline;
+        white-space: nowrap;
+    }
+</style>
+<CascadingValue Name="loadedLAYOUT" Value="loaded" >
+    <CascadingValue Name="DarkMode" Value="useDarkMode">
+        <CascadingValue Name="AuthSession" Value="loggedIn">
+            <CascadingValue Name="AuthUser" Value="User">
+                <CascadingValue Name="DarkModeCallback" Value="DarkModeCallback">
+                    <MudLayout Style="height:100vh; overflow:scroll; background: --mud-palette-background-grey;" Class="disabled!mud-theme-primary">
+                        <AuthorizeView>
+                            <Authorized>
+                                @{
+                                    loggedIn = true;
+                                }
+                            </Authorized>
+                            <NotAuthorized>
+                                @{
+                                    loggedIn = false;
+                                }
+                            </NotAuthorized>
+                        </AuthorizeView>
+                        @Body
+                    </MudLayout>
+                </CascadingValue>
+            </CascadingValue>
+        </CascadingValue>
+    </CascadingValue>
+</CascadingValue>
+
+@code {
+    public bool loaded
+    {
+        get
+        {
+            return (CustomTheme.PaletteDark.AppbarBackground == new MudBlazor.Utilities.MudColor("#27272fcc"));
+        }
+    }
+
+    private MudThemeProvider _mudThemeProvider;
+    public static MudTheme CustomTheme = new();
+
+    public UserAccount User { get; set; }
+    public bool loggedIn { get; set; }
+
+
+    public bool useDarkMode;
+    //{
+    //    get
+    //    {
+    //        return currentTheme == "dark";
+    //    }
+    //    set
+    //    {
+    //        currentTheme = (value ? "dark" : "white");
+    //        _ = UserPreferences.SetCurrentThemePreference(currentTheme);
+    //    }
+    //}
+    public string currentTheme;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var result = await protectedSessionStorage.GetAsync<UserAccount>("user");
+        if (result.Success)
+        {
+            User = result.Value!;
+        }
+        if (firstRender)
+        {
+            await UpdateUserPrefs();
+            CustomTheme.Palette.AppbarBackground = new MudBlazor.Utilities.MudColor("#f8f9faff");
+            CustomTheme.Palette.DrawerBackground = new MudBlazor.Utilities.MudColor("#ebebebff");
+            CustomTheme.Palette.Background = new MudBlazor.Utilities.MudColor("#f8f9fa");
+            CustomTheme.Palette.Primary = new MudBlazor.Utilities.MudColor(Colors.Blue.Default);
+            CustomTheme.Palette.AppbarText = new MudBlazor.Utilities.MudColor("#424242ff");
+            CustomTheme.Palette.Divider = new MudBlazor.Utilities.MudColor("#424242ff");
+
+            CustomTheme.PaletteDark.AppbarBackground = new MudBlazor.Utilities.MudColor("#27272fcc");
+            CustomTheme.PaletteDark.Primary = new MudBlazor.Utilities.MudColor(Colors.Blue.Darken2);
+            CustomTheme.PaletteDark.Divider = new MudBlazor.Utilities.MudColor("#bebec0");
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task UpdateUserPrefs()
+    {
+        if (await UserPreferences.ExistsThemePreference())
+        {
+            currentTheme = await UserPreferences.GetCurrentThemePreference();
+            useDarkMode = (currentTheme == "dark");
+        }
+        else
+        {
+            // Set default theme preference if it doesn't exist
+            useDarkMode = await _mudThemeProvider.GetSystemPreference();
+            currentTheme = (useDarkMode ? "dark" : "white");
+            await UserPreferences.SetCurrentThemePreference(currentTheme);
+        }
+    }
+
+    private EventCallback darkModeCallback = EventCallback.Empty;
+    public EventCallback DarkModeCallback
+    {
+        get
+        {
+            if (darkModeCallback.Equals(EventCallback.Empty))
+                darkModeCallback = EventCallback.Factory.Create(this, ChangeDarkMode);
+            return darkModeCallback;
+        }
+    }
+
+    public async void ChangeDarkMode()
+    {
+        useDarkMode = !useDarkMode;
+        currentTheme = (useDarkMode ? "dark" : "white");
+        await UserPreferences.SetCurrentThemePreference(currentTheme);
+        StateHasChanged();
+    }
+}

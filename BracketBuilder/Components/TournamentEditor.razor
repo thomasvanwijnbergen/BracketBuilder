@@ -1,0 +1,199 @@
+﻿@inject NavigationManager navManager;
+@inject IDatabaseService databaseService;
+@inject DatabaseDTOService dtoService;
+@inject ISnackbar snackbar;
+
+@using MudExtensions;
+
+
+@if (CurrentTournament != null)
+{
+    
+    <MudPaper Class="d-flex flex-column gap-4 pa-4">
+
+        @if (CreateNew)
+        {
+            <MudText Typo="TitleTypo">Create tournament</MudText>
+        }
+        else
+        {
+            <MudText Typo="TitleTypo">Edit tournament</MudText>
+        }
+        <MudSelect Label="Max players" T="int" @bind-Value="CurrentTournament.MaxPlayers">
+            @foreach (int MaxPlayer in MaxPlayers)
+            {
+                <MudSelectItem Value="MaxPlayer">@MaxPlayer</MudSelectItem>
+            }
+        </MudSelect>
+
+        <div class="d-flex flex-row gap-2 align-center">
+            <MudSwitch T="bool" @bind-Checked="UseDate" Color="Color.Primary">Use date</MudSwitch>
+            @if (UseDate)
+            {
+                <MudDatePicker  Adornment="Adornment.Start" AdornmentColor="Color.Info" IsDateDisabledFunc="(d) => d < DateTime.Now" Label="Starting date" Editable="true" @bind-Date="CurrentTournament.StartingDate" Placeholder="Select A starting Date" />
+            }
+        </div>
+        <div class="d-flex flex-row gap-2 align-center">
+            <MudSwitch T="bool" @bind-Checked="CurrentTournament.isPublic" Color="Color.Primary"></MudSwitch>
+            <MudIcon Icon="@(CurrentTournament.isPublic ? Icons.Material.Filled.Public : Icons.Material.Filled.VisibilityOff)" />
+            <MudText>@(CurrentTournament.isPublic ? "Public" : "Private")</MudText>
+        </div>
+        <MudPasswordField Label="Password" HelperText="Leave empty for no password" T="string" @bind-Value="CurrentTournament.Password"></MudPasswordField>
+        <MudTextField Label="Email Domains" Placeholder="@("@gmail.com\r@outlook.com\r@yahoo.com")" Lines="3" HelperText="Leave empty for no requirements" T="string" @bind-Value="CurrentTournament.EmailDomainsString"></MudTextField>
+        <MudTextField @bind-Value="CurrentTournament.Name" HelperText="The name for the tournament" Label="Name"></MudTextField>
+
+        <MudButton OnClick="OpenDialog" Variant="Variant.Filled" Color="Color.Primary">
+            Edit description
+        </MudButton>
+        <MudDialog @bind-IsVisible="visible" Options="dialogOptions">
+            <TitleContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-3" /> Edit description
+                </MudText>
+            </TitleContent>
+            <DialogContent>
+                <MudSwitch T="bool" @bind-Checked="UseDescription" Color="Color.Primary">Use description</MudSwitch>
+                @if (UseDescription)
+                {
+                    <MudTextField Lines="8" OnKeyUp="() => updateVarient = Variant.Filled" @bind-Value="TempDescription" HelperText="Description about the tournament (supports html)" Label="Description"></MudTextField>
+                    <MudButton Color="Color.Success" Variant="@updateVarient" OnClick="() => {CurrentTournament.Description = TempDescription; updateVarient = Variant.Outlined;}">Update</MudButton>
+                    <MudExpansionPanel IsExpanded="true">
+                        <TitleContent>
+                            <MudText Typo="Typo.h5">Preview:</MudText>
+                        </TitleContent>
+                        <ChildContent>
+                            @((MarkupString)CurrentTournament!.Description!)
+                        </ChildContent>
+                    </MudExpansionPanel>
+                }
+            </DialogContent>
+            <DialogActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit" Class="px-10">Close</MudButton>
+            </DialogActions>
+        </MudDialog>
+        @if (CreateNew)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="CreateTournament">Create Tournament</MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="UpdateTournament">Save changes</MudButton>
+        }
+    </MudPaper>
+}
+
+@code {
+    [CascadingParameter(Name = "IsMobile")]
+    public bool IsMobile { get; set; }
+
+
+    [Parameter]
+    public Tournament CurrentTournament { get; set; } = null;
+
+    [Parameter]
+    public bool CreateNew { get; set; } = true;
+
+    [Parameter]
+    public UserAccount User { get; set; }
+
+    int[] MaxPlayers = new int[] { 8, 16, 32, 64, 128, 256, 512 };
+
+    private Typo TitleTypo => IsMobile ? Typo.h4 : Typo.h2;
+
+    private bool visible;
+    private void OpenDialog() => visible = true;
+    void Submit() => visible = false;
+
+    private DialogOptions dialogOptions = new() { FullWidth = true };
+
+    public Variant updateVarient = Variant.Outlined;
+
+    public bool UseDate
+    {
+        get
+        {
+            return CurrentTournament.StartingDate != null;    
+        }
+        set
+        {
+            if (value)
+                CurrentTournament.StartingDate = DateTime.Now;
+            else
+                CurrentTournament.StartingDate = null;
+        }
+    }
+
+    public bool UseDescription
+    {
+        get
+        {
+            return CurrentTournament.Description != null;
+        }
+        set
+        {
+            if (value)
+                CurrentTournament.Description = "<h2>hello world</h2>";
+            else
+                CurrentTournament.Description = null;
+
+        }
+    }
+
+    public string TempDescription = "<h2>hello world</h2>";
+
+    protected override void OnInitialized()
+    {
+        if (CreateNew)
+        {
+            CurrentTournament = new Tournament();
+            CurrentTournament.Password = "";
+            CurrentTournament.isPublic = true;
+            CurrentTournament.Name = "Tournament for ...";
+            CurrentTournament.Creator = User;
+            CurrentTournament.MaxPlayers = 8;
+        }
+        else
+        {
+            TempDescription = CurrentTournament.Description;    
+        }
+
+        updateVarient = (CurrentTournament.Description == TempDescription) ? Variant.Outlined : Variant.Filled;
+
+
+        base.OnInitialized();   
+    }
+    private async Task CreateTournament()
+    {
+        try
+        {
+            CurrentTournament.CreationDate = DateTime.Now;
+            var guid = await dtoService.AddTournament(CurrentTournament);
+            if (guid != Guid.Empty)
+            {
+                snackbar.Add("Tournament created", Severity.Success);
+                navManager.NavigateTo($"tournament/{guid}/detail");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.InnerException.Message);
+            snackbar.Add("Error:" + ex.InnerException.Message, Severity.Error);
+        }
+    }
+
+    private async Task UpdateTournament()
+    {
+        try
+        {
+            await dtoService.UpdateTournament(CurrentTournament.Id, CurrentTournament, null);
+            snackbar.Add("Tournament updated!", Severity.Success);
+            navManager.NavigateTo($"tournament/{CurrentTournament.Guid}/detail");
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.InnerException.Message);
+            snackbar.Add("Error:" + ex.InnerException.Message, Severity.Error);
+        }
+    }
+}

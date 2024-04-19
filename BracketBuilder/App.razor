@@ -1,0 +1,28 @@
+﻿@inject IHttpContextAccessor httpContextAccessor;
+@inject ISnackbar snackBar;
+
+<MediaQueryList>
+    <CascadingAuthenticationState>
+        <Router AppAssembly="@typeof(App).Assembly">
+            <Found Context="routeData">
+                <CascadingValue Name="IsMobile" Value="@IsSmall">
+                    <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@layoutType" />
+                </CascadingValue>
+            </Found>
+            <NotFound>
+                <PageTitle>Not found</PageTitle>
+                <LayoutView Layout="@layoutType">
+                    <p role="alert">Sorry, there's nothing at this address.</p>
+                </LayoutView>
+            </NotFound>
+        </Router>
+    </CascadingAuthenticationState>
+    <MediaQuery Media="@Breakpoints.SmallDown" @bind-Matches="IsSmall" />
+</MediaQueryList>
+
+@code{
+    public bool IsMobile { get; set; }
+    public Type layoutType => (IsSmall ? typeof(MobileLayout) : typeof(ComputerLayout));
+
+    bool IsSmall = false;
+}
